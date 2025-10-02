@@ -1,0 +1,288 @@
+.node {
+  background: #ffffff;
+  border: 1px solid #d1d9e0;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  width: 280px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  color: #1f2328;
+
+  &.selected {
+    border: 2px solid #1677ff;
+    box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.2);
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafafa;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+
+.icon {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: #1677ff;
+  border-radius: 4px;
+
+  .anticon {
+    font-size: 12px;
+  }
+}
+
+.label {
+  font-weight: 500;
+  color: #1f2328;
+}
+
+.labelInput {
+  border: none;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.content {
+  padding: 12px;
+}
+
+.conditionType {
+  margin-bottom: 16px;
+  
+  > span {
+    font-size: 12px;
+    color: #6b7280;
+    display: block;
+    margin-bottom: 4px;
+  }
+}
+
+.conditionTypeValue {
+  background: #f5f5f5;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #1f2328;
+  cursor: pointer;
+  
+  &:hover {
+    border-color: #1677ff;
+  }
+}
+
+.pathsSection {
+  margin-bottom: 8px;
+}
+
+.pathsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  
+  > span {
+    font-size: 14px;
+    font-weight: 500;
+    color: #1f2328;
+  }
+}
+
+.addPathButton {
+  padding: 0;
+  border: none;
+  color: #1677ff;
+  
+  &:hover {
+    color: #0958d9;
+    background: transparent;
+  }
+}
+
+.pathsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pathItem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fafafa;
+  
+  &:hover {
+    border-color: #1677ff;
+  }
+}
+
+.pathInputGroup {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  gap: 4px;
+}
+
+.pathInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 12px;
+  
+  &:focus {
+    box-shadow: none;
+  }
+}
+
+.codeButton {
+  padding: 2px 4px;
+  border: none;
+  color: #6b7280;
+  font-size: 12px;
+  min-width: auto;
+  height: auto;
+  line-height: 1;
+  
+  &:hover {
+    color: #1677ff;
+    background: rgba(22, 119, 255, 0.1);
+  }
+}
+
+.deleteButton {
+  padding: 2px 4px;
+  border: none;
+  color: #6b7280;
+  font-size: 12px;
+  min-width: auto;
+  height: auto;
+  line-height: 1;
+  
+  &:hover {
+    color: #ff4d4f;
+    background: rgba(255, 77, 79, 0.1);
+  }
+}
+
+.removePathButton {
+  padding: 0;
+  border: none;
+  color: #6b7280;
+  
+  &:hover {
+    color: #ef4444;
+    background: transparent;
+  }
+}
+
+.elsePathItem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fafafa;
+  
+  > span {
+    font-size: 12px;
+    color: #1f2328;
+  }
+}
+
+.elsePathToggle {
+  display: flex;
+  align-items: center;
+}
+
+.toggleButton {
+  padding: 2px 8px;
+  border: none;
+  background: #1677ff;
+  color: white;
+  border-radius: 4px;
+  font-size: 10px;
+  height: 20px;
+  
+  &:hover {
+    background: #0958d9;
+    color: white;
+  }
+}
+
+.addConditionalPath {
+  padding: 12px;
+  text-align: center;
+}
+
+.addConditionalPathButton {
+  color: #1677ff;
+  border: 1px dashed #1677ff;
+  border-radius: 6px;
+  width: 100%;
+  height: auto;
+  padding: 8px 12px;
+  font-size: 12px;
+  
+  &:hover {
+    color: #0958d9;
+    border-color: #0958d9;
+    background: rgba(22, 119, 255, 0.05);
+  }
+  
+  .anticon {
+    margin-right: 8px;
+  }
+}
+
+.handleSource {
+  right: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 10px;
+  background: #1677ff;
+  border-radius: 5px;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.handleElse {
+  right: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 10px;
+  background: #ff4d4f;
+  border-radius: 5px;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.handleTarget {
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 10px;
+  height: 10px;
+  background: #1677ff;
+  border-radius: 5px;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+}

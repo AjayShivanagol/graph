@@ -1,0 +1,199 @@
+:root {
+  --vf-border: #d1d9e0;
+  --vf-selected: #1677ff;
+  --vf-text: #1f2328;
+  --vf-muted: #6b7280;
+  --vf-bg: #ffffff;
+  --vf-header-bg: #fafafa;
+  --vf-header-sep: #f0f0f0;
+}
+
+/* Minimal node styles - no hover effects */
+.vf-node {
+  /* Basic styling */
+  background: #ffffff;
+  border: 1px solid #d1d9e0;
+  border-radius: 12px;
+  color: #1f2328;
+  font-family: system-ui, -apple-system, sans-serif;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  cursor: pointer;
+  box-sizing: border-box;
+  overflow: visible;
+  
+  /* Disable all animations and transforms */
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  
+  /* Enable hardware acceleration */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  perspective: 1000;
+  -webkit-perspective: 1000;
+  /* Allow normal interactions */
+  pointer-events: auto;
+}
+
+/* Re-enable pointer events for content */
+.vf-node > * {
+  pointer-events: auto;
+}
+
+/* Disable animations on children to reduce flicker (do not override transforms) */
+.vf-node * {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* Selection style - applied via class */
+.vf-node.selected {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
+}
+
+.vf-node:hover .vf-node__header {
+  background-color: #f0f7ff !important;
+}
+.vf-node.is-selected {
+  /* Keep border width constant to avoid reflow */
+  border: 1px solid var(--vf-selected);
+  /* Add an outer ring using shadow instead of increasing border width */
+  box-shadow: 0 0 0 3px rgba(22,119,255,0.2);
+}
+.vf-node--sm { width: 240px; }
+.vf-node--md { width: 260px; }
+
+.vf-node__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--vf-header-sep);
+  background: var(--vf-header-bg);
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+.vf-node__title { font-size: 12px; font-weight: 600; }
+.vf-node__content { padding: 10px; font-size: 12px; color: var(--vf-muted); }
+
+.vf-node__icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+.vf-node__icon--blue { background: #3b82f6; color: #fff; }
+.vf-node__icon--green { background: #10b981; color: #fff; }
+.vf-node__icon--red { background: #ef4444; color: #fff; }
+.vf-node__icon--slate { background: #94a3b8; }
+
+/* Card specific */
+.vf-card__image {
+  width: 100%;
+  height: 80px;
+  background: #f3f4f6;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  font-size: 12px;
+}
+.vf-card__button {
+  padding: 4px 8px;
+  background: #1677ff;
+  color: #fff;
+  border-radius: 6px;
+  font-size: 12px;
+  text-align: center;
+  margin-bottom: 6px;
+}
+.vf-card__more { font-size: 12px; color: #9ca3af; }
+.vf-card__title { font-size: 12px; font-weight: 600; color: #111827; margin-bottom: 6px; }
+.vf-card__desc { font-size: 12px; color: #4b5563; margin-bottom: 8px; }
+
+/* React Flow Node Wrapper Hover Effects */
+/* IMPORTANT: do NOT override transform on RF nodes (used for positioning) */
+.react-flow__node {
+  transition: none !important; /* disable animations but keep transform intact */
+}
+
+/* Remove hover overrides entirely to avoid breaking positioning */
+/* Intentionally left blank: no .react-flow__node:hover rules */
+
+/* Handles */
+.vf-handle {
+  width: 12px !important;
+  height: 12px !important;
+  background: #94a3b8 !important;
+  border-radius: 50% !important;
+  border: 2px solid #ffffff !important;
+}
+.vf-handle--green { background: #10b981 !important; }
+.vf-handle--red { background: #ef4444 !important; }
+
+/* Small path labels next to handles */
+.vf-path-label {
+  position: absolute;
+  font-size: 11px;
+  line-height: 1;
+  color: #6b7280;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 4px 6px;
+  pointer-events: none;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.vf-path-label--success { color: #065f46; background: #ecfdf5; border-color: #a7f3d0; }
+.vf-path-label--failure { color: #991b1b; background: #fef2f2; border-color: #fecaca; }
+
+/* HTTP method badge */
+.vf-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+.vf-badge--get { background: #f0f9ff; color: #0369a1; }
+.vf-badge--post { background: #eff6ff; color: #2563eb; }
+.vf-badge--put { background: #fefce8; color: #ca8a04; }
+.vf-badge--delete { background: #fef2f2; color: #dc2626; }
+.vf-badge--default { background: #f9fafb; color: #6b7280; }
+
+/* Generic text helpers */
+.vf-text-primary { color: #111827; }
+.vf-text-secondary { color: #4b5563; }
+.vf-text-muted { color: #6b7280; }
+.vf-text-subtle { color: #9ca3af; }
+
+/* Simple row layout */
+.vf-row { display: flex; align-items: center; gap: 8px; }
+
+/* Badge/label chips */
+.vf-badge-mono {
+  font-family: monospace;
+  background: #f3f4f6;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+.vf-kv-label { font-size: 12px; color: var(--vf-muted); }
+
+/* Capture specific */
+.vf-capture__prompt { font-size: 12px; color: #374151; margin-bottom: 8px; }
+.vf-capture__validation { font-size: 12px; color: #9ca3af; }
+
+/* Editable header title inside node header */
+.vf-title-editable { font-weight: 500; cursor: text; flex: 1; }
+
+/* Inline AntD Input used for renaming */
+input.ant-input.vf-input-inline {
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+}

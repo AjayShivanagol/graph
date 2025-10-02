@@ -1,0 +1,60 @@
+/* Prompt Editor Modal Styles */
+.prompt-editor-modal .ant-modal-content {
+  padding: 0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.prompt-editor-modal .ant-modal-body {
+  padding: 0;
+}
+
+/* Custom scrollbar for text areas */
+.prompt-editor-modal .ant-input {
+  border-radius: 8px;
+}
+
+.prompt-editor-modal .ant-input:focus,
+.prompt-editor-modal .ant-input-focused {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
+}
+
+/* Settings panel animations */
+.prompt-settings-panel {
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Starter templates hover effects */
+.starter-template-btn:hover {
+  background-color: #f5f5f5;
+  border-radius: 4px;
+}
+
+/* Output area styling */
+.prompt-output-area {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  line-height: 1.6;
+}
+
+/* Model selector with icons */
+.model-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.model-option-icon {
+  font-size: 16px;
+}

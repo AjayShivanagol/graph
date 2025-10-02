@@ -1,0 +1,209 @@
+@use './variables' as *;
+
+.node {
+  @extend %node-base;
+  position: relative;
+  width: 240px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: visible;
+  transition: all 0.2s ease;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  &.selected {
+    box-shadow: 0 0 0 2px #1677ff;
+    border-color: #1677ff;
+  }
+
+  .content {
+    padding: 0;
+  }
+
+  &__card {
+    padding: 12px;
+    border-bottom: 1px solid var(--vf-header-sep);
+    
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__carouselGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  &__image {
+    width: 100%;
+    height: 120px;
+    background-color: var(--vf-icon-bg);
+    border-radius: 4px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--vf-icon-color);
+  }
+
+  &__imagePreview {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  &__title {
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: var(--vf-node-text);
+  }
+
+  &__description {
+    font-size: 12px;
+    color: var(--vf-node-muted);
+    line-height: 1.4;
+  }
+
+  &__buttons {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: relative;
+    overflow: visible;
+  }
+
+  &__buttonRow {
+    position: relative;
+    display: flex;
+    align-items: center;
+    overflow: visible;
+    min-height: 34px;
+    padding-right: 24px;
+  }
+
+  &__buttonPreview {
+    flex: 0 0 100%;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  &__buttonHandle {
+    position: absolute;
+    top: 50%;
+    right: -6px;
+    transform: translateY(-50%);
+  }
+
+  &__buttonActionsRail {
+    position: absolute;
+    top: 60%;
+    left: calc(100% + 20px);
+    transform: translateY(-50%);
+    display: inline-flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  &__actionChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #eff4ff;
+    border: 1px solid #dbeafe;
+    font-size: 12px;
+    color: #1f2937;
+    white-space: nowrap;
+  }
+
+  &__actionIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #2563eb;
+  }
+
+  &__actionLabel {
+    font-weight: 500;
+  }
+
+  &__actionPlaceholder {
+    font-size: 12px;
+    color: #94a3b8;
+  }
+
+  &__actionConnector {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: #e2e8f0;
+    color: #475569;
+    font-size: 10px;
+    flex: 0 0 auto;
+    box-shadow: 0 0 0 1px #dbeafe;
+  }
+
+  &__moreCards {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    border: 1px dashed var(--vf-header-sep);
+    border-radius: 8px;
+    color: var(--vf-node-muted);
+    font-size: 12px;
+    min-width: 80px;
+  }
+
+  .handle {
+    width: 10px;
+    height: 10px;
+    border-radius: 5px;
+    border: 2px solid white;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+    z-index: 1;
+    position: absolute;
+    pointer-events: auto;
+    background: #ec4899;
+
+    &--top {
+      top: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    &--bottom {
+      bottom: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    &--button {
+      background-color: #52c41a;
+    }
+
+  }
+
+  .handleInner {
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+  }
+}

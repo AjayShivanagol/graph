@@ -1,0 +1,74 @@
+/* Ant Design styles will be imported automatically by the components */
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
+}
+
+/* Custom CSS variables for consistency */
+:root {
+  --primary-color: #1890ff;
+  --success-color: #52c41a;
+  --warning-color: #faad14;
+  --error-color: #ff4d4f;
+  --text-color: rgba(0, 0, 0, 0.85);
+  --text-color-secondary: rgba(0, 0, 0, 0.65);
+  --background-color: #ffffff;
+  --border-color: #d9d9d9;
+  --border-radius: 6px;
+}
+
+/* Dark theme variables */
+[data-theme='dark'] {
+  --primary-color: #177ddc;
+  --success-color: #49aa19;
+  --warning-color: #d89614;
+  --error-color: #dc4446;
+  --text-color: rgba(255, 255, 255, 0.85);
+  --text-color-secondary: rgba(255, 255, 255, 0.65);
+  --background-color: #141414;
+  --border-color: #424242;
+}
+
+/* Application specific styles */
+.vf-app {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* React Flow specific overrides for Ant Design */
+.react-flow {
+  background: var(--background-color);
+}
+
+/* Make outer RF node transparent so each node component controls its own border/background */
+.react-flow__node {
+  border: none;
+  background: transparent;
+  color: var(--text-color);
+}
+
+.react-flow__edge-path {
+  stroke: var(--primary-color);
+}
+
+/* Fix for dropdown z-index to ensure they appear above all elements */
+.ant-select-dropdown {
+  z-index: 10000 !important;
+}
+
+.ant-select-dropdown-placement-bottomLeft,
+.ant-select-dropdown-placement-bottomRight {
+  z-index: 10000 !important;
+}
+
+/* Ensure condition builder dropdowns are always visible */
+.condition-builder .ant-select-dropdown {
+  z-index: 10001 !important;
+}

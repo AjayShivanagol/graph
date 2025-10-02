@@ -1,0 +1,88 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 24px;
+  height: 64px;
+  background-color: #fff;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.leftSection {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.logoSection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .logo {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #1890ff 0%, #722ed1 100%);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    svg {
+      color: #fff;
+      font-size: 18px;
+    }
+  }
+
+  .title {
+    font-weight: 600;
+    font-size: 18px;
+  }
+}
+
+.workflowSection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .workflowInput {
+    font-weight: 500;
+    font-size: 18px;
+    padding: 4px 8px;
+  }
+
+  .saveIndicator {
+    width: 8px;
+    height: 8px;
+    background-color: #faad14;
+    border-radius: 50%;
+  }
+}
+
+.rightSection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.actionButton {
+  border-radius: 6px;
+
+  &.shareButton {
+    color: #1890ff;
+  }
+
+  &.callButton {
+    color: #1890ff;
+  }
+
+  &.runButton {
+    background-color: #1677ff;
+    border-color: #1677ff;
+  }
+
+  &.publishButton {
+    background-color: #52c41a;
+    border-color: #52c41a;
+  }
+}

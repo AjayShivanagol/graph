@@ -1,0 +1,80 @@
+.node {
+  background: #ffffff;
+  border: 1px solid #d1d9e0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  width: 240px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  color: #1f2328;
+  overflow: visible;
+  position: relative;
+  z-index: 1;
+
+  &.selected {
+    border: 2px solid #1677ff;
+    box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.2);
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafafa;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ef4444;
+  border-radius: 50%;
+  color: white;
+  font-size: 12px;
+}
+
+.label {
+  font-weight: 500;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.content {
+  padding: 12px;
+  font-size: 13px;
+  color: #666;
+}
+
+.message {
+  padding: 4px 0;
+  color: #666;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.handle {
+  width: 10px !important;
+  height: 10px !important;
+  border-radius: 50%;
+  background: #ef4444;
+  position: absolute;
+  pointer-events: auto;
+  z-index: 10;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.handleInner {
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+}

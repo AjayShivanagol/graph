@@ -1,0 +1,49 @@
+{
+  "name": "flow-editor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "author": {
+    "name": "Ajay Shivanagol",
+    "email": "ashivanagol@nouveau-labs.com"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^5.2.6",
+    "@hookform/resolvers": "^3.3.2",
+    "@monaco-editor/react": "^4.7.0",
+    "@reduxjs/toolkit": "^2.0.1",
+    "antd": "^5.12.8",
+    "clsx": "^2.1.1",
+    "date-fns": "^3.6.0",
+    "framer-motion": "^12.6.2",
+    "monaco-editor": "^0.52.2",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "react-hook-form": "^7.48.2",
+    "react-redux": "^9.0.4",
+    "react-resizable-panels": "^2.1.7",
+    "react-router-dom": "^6.20.1",
+    "reactflow": "^11.10.4",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@typescript-eslint/eslint-plugin": "^6.14.0",
+    "@typescript-eslint/parser": "^6.14.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "eslint": "^8.55.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.5",
+    "sass": "^1.90.0",
+    "typescript": "^5.2.2",
+    "vite": "^5.0.8"
+  }
+}

@@ -1,0 +1,460 @@
+/* Voiceflow-inspired Design System with Ant Design Integration */
+:root {
+  /* Primary Colors - Ant Design Blue */
+  --vf-primary: #1890ff;
+  --vf-primary-hover: #40a9ff;
+  --vf-primary-light: #e6f7ff;
+  
+  /* Canvas Colors */
+  --vf-canvas-bg: #f5f5f5;
+  --vf-canvas-grid: #f0f0f0;
+  --vf-canvas-grid-dot: #d9d9d9;
+  
+  /* Panel Colors */
+  --vf-panel-bg: #ffffff;
+  --vf-panel-border: #f0f0f0;
+  --vf-panel-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  
+  /* Node/Block Colors */
+  --vf-node-bg: #ffffff;
+  --vf-node-border: #d9d9d9;
+  --vf-node-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  --vf-node-selected: #1890ff;
+  --vf-node-hover: #f5f5f5;
+  
+  /* Text Colors */
+  --vf-text-primary: rgba(0, 0, 0, 0.85);
+  --vf-text-secondary: rgba(0, 0, 0, 0.65);
+  --vf-text-muted: rgba(0, 0, 0, 0.45);
+  
+  /* Sidebar */
+  --vf-sidebar-bg: #ffffff;
+  --vf-sidebar-border: #f0f0f0;
+  --vf-sidebar-width: 280px;
+  
+  /* Header */
+  --vf-header-bg: #ffffff;
+  --vf-header-border: #f0f0f0;
+  --vf-header-height: 64px;
+  
+  /* Block Types - Updated for Ant Design color palette */
+  --vf-block-start: #52c41a;
+  --vf-block-message: #1890ff;
+  --vf-block-condition: #faad14;
+  --vf-block-action: #722ed1;
+  --vf-block-integration: #ff4d4f;
+  --vf-block-end: #8c8c8c;
+  
+  /* Connection Colors */
+  --vf-connection-default: #d9d9d9;
+  --vf-connection-active: #1890ff;
+  --vf-connection-hover: #1d4ed8;
+  
+  /* Spacing */
+  --vf-spacing-xs: 4px;
+  --vf-spacing-sm: 8px;
+  --vf-spacing-md: 16px;
+  --vf-spacing-lg: 24px;
+  --vf-spacing-xl: 32px;
+  
+  /* Border Radius */
+  --vf-radius-sm: 4px;
+  --vf-radius-md: 8px;
+  --vf-radius-lg: 12px;
+  --vf-radius-xl: 16px;
+  
+  /* Typography */
+  --vf-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --vf-font-size-xs: 12px;
+  --vf-font-size-sm: 14px;
+  --vf-font-size-md: 16px;
+  --vf-font-size-lg: 18px;
+  --vf-font-size-xl: 20px;
+}
+
+/* Global Voiceflow Styles */
+.vf-app {
+  font-family: var(--vf-font-family);
+  color: var(--vf-text-primary);
+  background: var(--vf-canvas-bg);
+  height: 100vh;
+  overflow: hidden;
+}
+
+.vf-header {
+  height: var(--vf-header-height);
+  background: var(--vf-header-bg);
+  border-bottom: 1px solid var(--vf-header-border);
+  border-radius: var(--border-radius);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--vf-spacing-lg);
+  z-index: 50;
+}
+
+.vf-sidebar {
+  width: var(--vf-sidebar-width);
+  background: var(--vf-sidebar-bg);
+  border-right: 1px solid var(--vf-sidebar-border);
+  height: calc(100vh - var(--vf-header-height));
+  overflow-y: auto;
+}
+
+/* Responsive styles for mobile properties panel */
+.mobile-properties-toggle {
+  display: none !important;
+}
+
+.desktop-properties-panel {
+  display: block;
+}
+
+@media (max-width: 1024px) {
+  .mobile-properties-toggle {
+    display: block !important;
+  }
+  
+  .desktop-properties-panel {
+    display: none !important;
+  }
+}
+
+/* Ant Design component overrides for Voiceflow theme */
+.ant-layout {
+  background: var(--vf-canvas-bg);
+}
+
+.ant-layout-header {
+  background: var(--vf-header-bg);
+  border-bottom: 1px solid var(--vf-header-border);
+  border-radius: var(--border-radius);
+  padding: 0;
+}
+
+.ant-layout-sider {
+  background: var(--vf-sidebar-bg);
+}
+
+.ant-btn-primary {
+  background-color: var(--vf-primary);
+  border-color: var(--vf-primary);
+}
+
+.ant-btn-primary:hover {
+  background-color: var(--vf-primary-hover);
+  border-color: var(--vf-primary-hover);
+}
+
+.vf-canvas-container {
+  flex: 1;
+  height: calc(100vh - var(--vf-header-height));
+  position: relative;
+  background: var(--vf-canvas-bg);
+}
+
+.vf-canvas {
+  width: 100%;
+  height: 100%;
+  background-color: var(--vf-canvas-bg);
+  background-image: 
+    radial-gradient(circle, var(--vf-canvas-grid-dot) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Block Styles */
+/* Disabled to allow inline styles to work properly */
+/*
+.vf-block {
+  background: var(--vf-node-bg);
+  border: 1px solid var(--vf-node-border);
+  border-radius: var(--vf-radius-lg);
+  box-shadow: var(--vf-node-shadow);
+  padding: var(--vf-spacing-md);
+  min-width: 200px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.vf-block:hover {
+  background: var(--vf-node-hover);
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+.vf-block.selected {
+  border-color: var(--vf-node-selected);
+  box-shadow: 0 0 0 2px var(--vf-primary-light);
+}
+*/
+
+/* Disabled to prevent interference with inline styles */
+/*
+.vf-block-header {
+  display: flex;
+  align-items: center;
+  gap: var(--vf-spacing-sm);
+  margin-bottom: var(--vf-spacing-sm);
+}
+
+.vf-block-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--vf-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: var(--vf-font-size-xs);
+}
+
+.vf-block-title {
+  font-size: var(--vf-font-size-sm);
+  font-weight: 600;
+  color: var(--vf-text-primary);
+}
+
+.vf-block-content {
+  font-size: var(--vf-font-size-xs);
+  color: var(--vf-text-secondary);
+  line-height: 1.4;
+}
+*/
+
+/* Removed background/padding overrides on React Flow nodes to avoid hover issues */
+
+/* Allow node components to render their own selected styles (border/box-shadow) */
+
+/* BASIC VF-BLOCK STYLING */
+.vf-block {
+  background: white;
+  border: 1px solid #d1d9e0;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  width: 240px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  color: #1f2328;
+  position: relative;
+}
+
+.vf-block.selected {
+  border: 2px solid #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.2);
+}
+
+.vf-block-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafafa;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+
+.vf-block-content {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.vf-block-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.vf-block-title {
+  font-weight: 500 !important;
+  color: #1f2328 !important;
+  font-size: 14px !important;
+  flex: 1 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
+/* Avoid overriding React Flow internals for transforms/paint */
+/* (removed will-change override) */
+
+/* Prevent jitter: keep a stable min-width only (do not force width on hover) */
+.vf-block {
+  min-width: 240px !important;
+}
+
+/* Keep visibility/opacity stable (do not touch display type) */
+.vf-block,
+.vf-block * {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Ensure node remains interactive but not altering layout on hover */
+/* Do not override transform on React Flow nodes; they rely on transform for positioning */
+/* Intentionally left blank to avoid interfering with React Flow */
+
+/* Minimal handle styling - avoid aggressive overrides */
+.react-flow__handle {
+  border-radius: 50%;
+}
+
+/* Block Type Colors */
+.vf-block-start .vf-block-icon { background: #10b981; }
+.vf-block-message .vf-block-icon { background: #3b82f6; }
+.vf-block-condition .vf-block-icon { background: #f59e0b; }
+.vf-block-action .vf-block-icon { background: #8b5cf6; }
+.vf-block-integration .vf-block-icon { background: #06b6d4; }
+.vf-block-end .vf-block-icon { background: #ef4444; }
+.vf-block-talk .vf-block-icon { background: #3b82f6; }
+.vf-block-listen .vf-block-icon { background: #10b981; }
+.vf-block-logic .vf-block-icon { background: #8b5cf6; }
+.vf-block-dev .vf-block-icon { background: #f59e0b; }
+
+/* Connection Handles */
+.vf-handle {
+  width: 12px;
+  height: 12px;
+  background: var(--vf-connection-default);
+  border: 2px solid white;
+  border-radius: 50%;
+}
+
+.vf-handle:hover {
+  background: var(--vf-connection-hover);
+}
+
+.vf-handle.connecting {
+  background: var(--vf-connection-active);
+}
+
+/* Sidebar Sections */
+.vf-sidebar-section {
+  padding: var(--vf-spacing-lg);
+  border-bottom: 1px solid var(--vf-panel-border);
+  border-radius: var(--border-radius);
+}
+
+.vf-sidebar-title {
+  font-size: var(--vf-font-size-sm);
+  font-weight: 600;
+  color: var(--vf-text-primary);
+  margin-bottom: var(--vf-spacing-md);
+}
+
+.vf-block-library {
+  display: grid;
+  gap: var(--vf-spacing-sm);
+}
+
+.vf-block-library-item {
+  display: flex;
+  align-items: center;
+  gap: var(--vf-spacing-sm);
+  padding: var(--vf-spacing-sm);
+  border-radius: var(--vf-radius-md);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.vf-block-library-item:hover {
+  background: var(--vf-node-hover);
+}
+
+.vf-block-library-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--vf-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: var(--vf-font-size-sm);
+}
+
+.vf-block-library-text {
+  flex: 1;
+}
+
+.vf-block-library-name {
+  font-size: var(--vf-font-size-sm);
+  font-weight: 500;
+  color: var(--vf-text-primary);
+}
+
+.vf-block-library-desc {
+  font-size: var(--vf-font-size-xs);
+  color: var(--vf-text-secondary);
+  margin-top: 2px;
+}
+
+/* Toolbar */
+.vf-toolbar {
+  position: absolute;
+  top: var(--vf-spacing-lg);
+  left: var(--vf-spacing-lg);
+  display: flex;
+  gap: var(--vf-spacing-sm);
+  z-index: 10;
+}
+
+.vf-toolbar-button {
+  background: var(--vf-panel-bg);
+  border: 1px solid var(--vf-panel-border);
+  border-radius: var(--vf-radius-md);
+  padding: var(--vf-spacing-sm) var(--vf-spacing-md);
+  font-size: var(--vf-font-size-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: var(--vf-panel-shadow);
+}
+
+.vf-toolbar-button:hover {
+  background: var(--vf-node-hover);
+}
+
+/* Properties Panel */
+.vf-properties-panel {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: var(--vf-sidebar-width);
+  height: 100%;
+  background: var(--vf-panel-bg);
+  border-left: 1px solid var(--vf-panel-border);
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  z-index: 20;
+}
+
+.vf-properties-panel.open {
+  transform: translateX(0);
+}
+
+/* Animations */
+@keyframes vf-fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.vf-fade-in {
+  animation: vf-fade-in 0.3s ease;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .vf-sidebar {
+    width: 100%;
+    position: absolute;
+    left: -100%;
+    transition: left 0.3s ease;
+    z-index: 30;
+  }
+  
+  .vf-sidebar.open {
+    left: 0;
+  }
+}

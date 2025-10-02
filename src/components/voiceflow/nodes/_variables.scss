@@ -1,0 +1,111 @@
+// Node Styling Variables
+:root {
+  // Colors
+  --vf-node-bg: #ffffff;
+  --vf-node-border: #d1d9e0;
+  --vf-node-selected: #1677ff;
+  --vf-node-text: #1f2328;
+  --vf-node-muted: #6b7280;
+  
+  // Header
+  --vf-header-bg: #f8fafc;  // Light blue-gray background for headers
+  --vf-header-sep: #e2e8f0;  // Slightly darker border for header separation
+  --vf-header-text: #1f2328; // Dark text for headers
+  
+  // Icons
+  --vf-icon-size: 20px;
+  --vf-icon-bg: #e2e8f0;    // Light gray for icon backgrounds
+  --vf-icon-color: #4b5563;  // Medium gray for icons
+  
+  // Status Colors
+  --vf-success: #10b981;
+  --vf-warning: #f59e0b;
+  --vf-error: #ef4444;
+  --vf-info: #3b82f6;
+  
+  // Shadows
+  --vf-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --vf-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --vf-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  
+  // Spacing
+  --vf-padding-x: 12px;
+  --vf-padding-y: 8px;
+  --vf-gap: 8px;
+  
+  // Border Radius
+  --vf-radius-sm: 4px;
+  --vf-radius: 8px;
+  --vf-radius-lg: 12px;
+  
+  // Transitions
+  --vf-transition: all 0.2s ease-in-out;
+}
+
+// Node Base Styles
+%node-base {
+  background: var(--vf-node-bg);
+  border: 1px solid var(--vf-node-border);
+  border-radius: var(--vf-radius);
+  box-shadow: var(--vf-shadow);
+  font-family: system-ui, -apple-system, sans-serif;
+  color: var(--vf-node-text);
+  transition: var(--vf-transition);
+  overflow: visible;
+  position: relative;
+  z-index: 1;
+  width: 240px;
+  cursor: pointer;
+  
+  &:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
+    border-color: var(--vf-node-selected);
+    
+    .header {
+      background-color: #f0f7ff;
+    }
+  }
+  
+  &.selected {
+    border: 2px solid var(--vf-node-selected);
+    box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.2);
+  }
+}
+
+// Node Header
+%node-header {
+  display: flex;
+  align-items: center;
+  gap: var(--vf-gap);
+  padding: var(--vf-padding-y) var(--vf-padding-x);
+  border-bottom: 1px solid var(--vf-header-sep);
+  background: var(--vf-header-bg);
+  border-top-left-radius: var(--vf-radius);
+  border-top-right-radius: var(--vf-radius);
+  color: var(--vf-header-text);
+  font-weight: 500;
+  font-size: 14px;
+}
+
+// Node Content
+%node-content {
+  padding: var(--vf-padding-y) var(--vf-padding-x);
+  font-size: 13px;
+  color: var(--vf-node-muted);
+  line-height: 1.4;
+}
+
+// Node Icon
+%node-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--vf-icon-size);
+  height: var(--vf-icon-size);
+  border-radius: var(--vf-radius-sm);
+  background: var(--vf-icon-bg);
+  color: var(--vf-icon-color);
+  font-size: 12px;
+  flex-shrink: 0;
+}

@@ -1,0 +1,335 @@
+.conditionBuilder {
+  background: #ffffff;
+  border: none;
+  border-radius: 0;
+  padding: 16px;
+  max-width: 100%;
+  box-shadow: none;
+  position: relative;
+  z-index: 1;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+  
+  // Add subtle text styling
+  color: #262626;
+  font-size: 14px;
+  line-height: 1.5;
+  
+  // Ensure dropdowns can overflow the container
+  overflow-y: visible;
+  
+  // Global dropdown z-index fix
+  :global(.ant-select-dropdown) {
+    z-index: 99999 !important;
+  }
+}
+
+.header {
+  margin-bottom: 16px;
+}
+
+.matchTypeSelector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: #f8fafc;
+  border-radius: 8px;
+  flex-wrap: wrap;
+  border: 1px solid #e2e8f0;
+}
+
+.matchButton {
+  flex-shrink: 0;
+  border: 1px solid #e2e8f0;
+  height: 32px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 500;
+  
+  &:first-of-type {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-right: none;
+  }
+  
+  &:last-of-type {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+  
+  &.ant-btn-default {
+    background: #ffffff;
+    color: #64748b;
+    border-color: #e2e8f0;
+    
+    &:hover {
+      background: #f1f5f9;
+      color: #475569;
+      border-color: #cbd5e1;
+    }
+  }
+  
+  &.ant-btn-primary {
+    background: #3b82f6;
+    border-color: #3b82f6;
+    color: white;
+    font-weight: 600;
+    
+    &:hover {
+      background: #2563eb;
+      border-color: #2563eb;
+    }
+  }
+}
+
+.questionMark {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: #e5e7eb;
+    color: #1677ff;
+    transform: scale(1.1);
+  }
+}
+
+.addRuleButton {
+  background: transparent;
+  border: none;
+  color: #1677ff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  
+  &:hover {
+    color: #4096ff;
+    background: rgba(22, 119, 255, 0.06);
+  }
+  
+  &:focus {
+    color: #4096ff;
+    background: rgba(22, 119, 255, 0.06);
+  }
+}
+
+.rulesList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.rulesHeader {
+  display: grid;
+  grid-template-columns: 1.5fr 140px 1.5fr 40px;
+  gap: 12px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #8c8c8c;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ruleItem {
+  display: grid;
+  grid-template-columns: 1.5fr 140px 1.5fr 40px;
+  gap: 12px;
+  padding: 8px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  align-items: center;
+  min-width: 0; /* Allow content to shrink */
+  
+  &:hover {
+    border-color: #d1d5db;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+}
+
+.conditionCell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0; /* Allow content to shrink */
+  overflow: hidden;
+  
+  /* Make VariablePicker take remaining space */
+  > :last-child {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.operatorCell,
+.valueCell {
+  display: flex;
+  align-items: center;
+  min-width: 0; /* Allow content to shrink */
+}
+
+.actionCell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  flex-shrink: 0;
+}
+
+.ifLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1f2328;
+  min-width: 24px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.variableSelect {
+  flex: 1;
+  
+  .ant-select-selector {
+    border-color: #d1d5db;
+    border-radius: 4px;
+  }
+}
+
+.operatorSelect {
+  width: 100%;
+  min-width: 80px;
+  
+  .ant-select-selector {
+    border-color: #d1d5db;
+    border-radius: 4px;
+  }
+  
+  // Force extremely high z-index for dropdown
+  .ant-select-dropdown {
+    z-index: 99999999 !important;
+    position: fixed !important;
+  }
+}
+
+// Global override for Ant Design Select dropdowns within condition builder
+:global(.ant-select-dropdown) {
+  z-index: 2147483647 !important; // Maximum z-index
+  position: fixed !important;
+  max-height: 250px !important;
+  overflow-y: auto !important;
+  pointer-events: auto !important;
+}
+
+:global(#super-high-dropdown) {
+  z-index: 2147483647 !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  pointer-events: none !important;
+  
+  .ant-select-dropdown {
+    pointer-events: auto !important;
+    z-index: 2147483647 !important;
+  }
+}
+
+:global(.ant-select-dropdown .rc-virtual-list) {
+  max-height: 250px !important;
+  overflow-y: auto !important;
+}
+
+:global(.ant-select-dropdown .ant-select-item-group) {
+  max-height: none !important;
+}
+
+:global(#dropdown-portal) {
+  z-index: 99999999 !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  pointer-events: none !important;
+  
+  .ant-select-dropdown {
+    pointer-events: auto !important;
+    z-index: 99999999 !important;
+  }
+}
+
+:global(#variable-picker-portal) {
+  z-index: 99999999 !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  pointer-events: none !important;
+  
+  .ant-select-dropdown {
+    pointer-events: auto !important;
+    z-index: 99999999 !important;
+  }
+}
+
+.valueInput {
+  width: 100%;
+  min-width: 0;
+  
+  &.ant-input {
+    border-color: #d1d5db;
+    border-radius: 4px;
+  }
+  
+  &:focus {
+    border-color: #1677ff;
+    box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.2);
+  }
+}
+
+.removeButton {
+  color: #6b7280;
+  min-width: 24px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  padding: 0;
+  flex-shrink: 0;
+  
+  &:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+  }
+  
+  &:focus {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+  }
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #e8e8e8;
+  background: #fafafa;
+  margin: 16px -16px -16px -16px;
+  padding: 12px 16px;
+  
+  button {
+    min-width: 70px;
+  }
+}

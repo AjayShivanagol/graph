@@ -1,0 +1,9 @@
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Original document -->
+  <path d="M3 2C3 1.44772 3.44772 1 4 1H9L12 4V12C12 12.5523 11.5523 13 11 13H4C3.44772 13 3 12.5523 3 12V2Z" fill="none" stroke="#6b7280" stroke-width="1.2"/>
+  <path d="M9 1V4H12" stroke="#6b7280" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Duplicate document (offset) -->
+  <path d="M5 4C5 3.44772 5.44772 3 6 3H11L14 6V14C14 14.5523 13.5523 15 13 15H6C5.44772 15 5 14.5523 5 14V4Z" fill="none" stroke="#6b7280" stroke-width="1.2"/>
+  <path d="M11 3V6H14" stroke="#6b7280" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

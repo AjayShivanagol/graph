@@ -1,0 +1,145 @@
+@use './variables' as *;
+
+.node {
+  @extend %node-base;
+
+  &__header {
+    @extend %node-header;
+    background: var(--vf-header-bg);
+    
+    .node__icon {
+      background: #8b5cf6; // Purple for prompt icon
+      color: white;
+    }
+  }
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    background: var(--vf-prompt-icon-bg);
+    color: var(--vf-prompt-icon);
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  &__title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #1f2937;
+    flex: 1;
+  }
+
+  &__content {
+    padding: 10px;
+    font-size: 12px;
+  }
+
+  &__text {
+    color: #374151;
+    margin-bottom: 8px;
+  }
+}
+
+.suggestions {
+  &__label {
+    color: #8c8c8c;
+    margin-bottom: 4px;
+    font-size: 12px;
+  }
+
+  &__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  &__item {
+    background: var(--vf-suggestion-bg);
+    color: var(--vf-suggestion-text);
+    border: 1px solid var(--vf-suggestion-border);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+}
+
+.inputInline {
+  flex-grow: 1;
+  font-size: 12px !important;
+  font-weight: 600;
+  height: 22px !important;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  outline: none;
+  transition: all 0.3s;
+
+  &:focus {
+    border-color: #40a9ff;
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+  }
+}
+
+.handle {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+  position: absolute;
+  z-index: 1;
+  opacity: 1;
+  transition: all 0.2s ease;
+
+  &--top {
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--vf-selected);
+  }
+
+  &--bottom {
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #10b981;
+  }
+}
+
+.pathLabel {
+  position: absolute;
+  bottom: 10px;
+  font-size: 11px;
+  color: #666;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+  transform: translateX(-50%);
+  text-align: center;
+  transition: all 0.2s ease;
+
+  &--success {
+    left: 25%;
+    color: #065f46;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  &--failure {
+    left: 75%;
+    color: #991b1b;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+}

@@ -1,0 +1,105 @@
+/* VoiceflowWorkspace.module.scss */
+
+.layout {
+  height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.mainLayout {
+  margin-left: 48px;
+}
+
+.header {
+  padding: 0;
+  background-color: #fff;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.contentLayout {
+  overflow: hidden;
+}
+
+.sider {
+  background: white;
+  border-right: 1px solid #f0f0f0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.2s;
+  height: calc(100vh - 64px);
+  overflow: auto;
+  flex-shrink: 0;
+}
+
+.content {
+  position: relative;
+  background-color: #f5f5f5;
+}
+
+.canvasContainer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle, #e0e0e0 1px, transparent 1px),
+    radial-gradient(circle, #e0e0e0 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+}
+
+.headerContainer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.titleContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.iconContainer {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.drawerIconContainer {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--header-color, #1677ff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 12px;
+}
+
+.settingsIcon {
+  cursor: pointer;
+  padding: 4px;
+}
+
+.propertiesPanelContainer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 320px;
+  background-color: #fff;
+  border-left: 1px solid #f0f0f0;
+  overflow-y: auto;
+  z-index: 10;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+}

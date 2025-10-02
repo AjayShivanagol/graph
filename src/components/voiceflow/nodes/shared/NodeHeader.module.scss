@@ -1,0 +1,57 @@
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafafa;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  min-height: 40px;
+}
+
+.icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: white;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.label {
+  font-weight: 500;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 4px;
+  color: #1f2328;
+  font-size: 14px;
+}
+
+.labelInput {
+  flex: 1;
+  height: 24px;
+  font-size: 14px;
+  padding: 0 4px;
+  margin: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  
+  &:focus {
+    box-shadow: none;
+  }
+
+  input {
+    padding: 0;
+    height: 24px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #1f2328;
+  }
+}
