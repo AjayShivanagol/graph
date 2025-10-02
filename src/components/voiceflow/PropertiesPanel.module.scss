@@ -1351,13 +1351,25 @@
 }
 
 .buttonsNodeEditor {
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  width: 320px;
+}
+
+.buttonsNodePopover {
+  :global(.ant-popover-inner) {
+    border-radius: 20px;
+    padding: 0;
+    box-shadow: 0 20px 36px rgba(15, 23, 42, 0.18);
+  }
+
+  :global(.ant-popover-arrow) {
+    display: none;
+  }
 }
 
 .buttonsNodeEditorTitle {
@@ -1381,6 +1393,7 @@
 
 .buttonsNodeMatchSelect {
   min-width: 160px;
+  flex: 1;
 }
 
 .buttonsNodeDivider {

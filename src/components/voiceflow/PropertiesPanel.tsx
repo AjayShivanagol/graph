@@ -102,6 +102,25 @@ interface ButtonsNodeButton {
   matchType: ButtonMatchType;
 }
 
+const buttonsEqual = (
+  a: ButtonsNodeButton[],
+  b: ButtonsNodeButton[]
+) => {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    const btnA = a[i];
+    const btnB = b[i];
+    if (
+      btnA.id !== btnB.id ||
+      btnA.label !== btnB.label ||
+      btnA.matchType !== btnB.matchType
+    ) {
+      return false;
+    }
+  }
+  return true;
+};
+
 interface ButtonsFallbackConfig {
   enabled: boolean;
   reprompts: string[];
@@ -3349,32 +3368,69 @@ export default function PropertiesPanel({
 
     const [buttonsState, setButtonsState] =
       useState<ButtonsNodeButton[]>(normalizedButtons);
-    const [selectedButtonId, setSelectedButtonId] = useState<string | null>(
-      normalizedButtons[0]?.id || null
-    );
+    const buttonsStateRef = useRef<ButtonsNodeButton[]>(normalizedButtons);
+    const normalizedButtonsRef = useRef<ButtonsNodeButton[]>(normalizedButtons);
+    const [activeButtonId, setActiveButtonId] = useState<string | null>(null);
+    const buttonLabelRefs = useRef<Record<string, ValueInputHandle | null>>({});
 
     useEffect(() => {
+      normalizedButtonsRef.current = normalizedButtons;
       setButtonsState(normalizedButtons);
-      setSelectedButtonId((prev) => {
-        if (!prev) return normalizedButtons[0]?.id || null;
-        return (
-          normalizedButtons.find((button) => button.id === prev)?.id ||
-          normalizedButtons[0]?.id ||
-          null
-        );
-      });
+      buttonsStateRef.current = normalizedButtons;
+      setActiveButtonId((prev) =>
+        prev && normalizedButtons.some((button) => button.id === prev)
+          ? prev
+          : null
+      );
     }, [normalizedButtons]);
 
-    const commitButtons = useCallback(
-      (nextButtons: ButtonsNodeButton[]) => {
-        setButtonsState(nextButtons);
-        handleUpdateNodeBatch({
-          buttons: nextButtons,
-          options: nextButtons.map((btn) => btn.label),
-        });
-      },
-      [handleUpdateNodeBatch]
-    );
+    useEffect(() => {
+      buttonsStateRef.current = buttonsState;
+    }, [buttonsState]);
+
+    useEffect(() => {
+      if (!activeButtonId) return;
+      const focusLater = window.setTimeout(() => {
+        const ref = buttonLabelRefs.current[activeButtonId];
+        ref?.focus?.();
+      }, 0);
+      return () => window.clearTimeout(focusLater);
+    }, [activeButtonId]);
+
+    const persistButtons = (next?: ButtonsNodeButton[]) => {
+      const payload = next ?? buttonsStateRef.current;
+      if (buttonsEqual(payload, normalizedButtonsRef.current)) {
+        return;
+      }
+      handleUpdateNodeBatch({
+        buttons: payload,
+        options: payload.map((btn) => btn.label),
+      });
+    };
+
+    useEffect(() => {
+      return () => {
+        persistButtons();
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedNodeId]);
+
+    const updateButtonLocal = (
+      id: string,
+      patch: Partial<ButtonsNodeButton>,
+      options: { persist?: boolean } = {}
+    ) => {
+      setButtonsState((current) => {
+        const next = current.map((button) =>
+          button.id === id ? { ...button, ...patch } : button
+        );
+        buttonsStateRef.current = next;
+        if (options.persist) {
+          persistButtons(next);
+        }
+        return next;
+      });
+    };
 
     const addButton = () => {
       const newButton: ButtonsNodeButton = {
@@ -3382,28 +3438,80 @@ export default function PropertiesPanel({
         label: "",
         matchType: "exact",
       };
-      const next = [...buttonsState, newButton];
-      commitButtons(next);
-      setSelectedButtonId(newButton.id);
+      const next = [...buttonsStateRef.current, newButton];
+      setButtonsState(next);
+      buttonsStateRef.current = next;
+      persistButtons(next);
+      setActiveButtonId(newButton.id);
     };
 
     const removeButton = (id: string) => {
-      const next = buttonsState.filter((button) => button.id !== id);
-      commitButtons(next);
-      if (selectedButtonId === id) {
-        setSelectedButtonId(next[0]?.id || null);
-      }
+      const next = buttonsStateRef.current.filter((button) => button.id !== id);
+      setButtonsState(next);
+      buttonsStateRef.current = next;
+      persistButtons(next);
+      setActiveButtonId((prev) => (prev === id ? null : prev));
+      delete buttonLabelRefs.current[id];
     };
 
-    const updateButton = (id: string, patch: Partial<ButtonsNodeButton>) => {
-      const next = buttonsState.map((button) =>
-        button.id === id ? { ...button, ...patch } : button
-      );
-      commitButtons(next);
-    };
+    const handleButtonPopoverOpenChange =
+      (id: string) => (open: boolean) => {
+        setActiveButtonId((prev) => {
+          if (open) {
+            if (prev && prev !== id) {
+              persistButtons();
+            }
+            return id;
+          }
+          if (prev === id) {
+            persistButtons();
+            return null;
+          }
+          return prev;
+        });
+      };
 
-    const selectedButton =
-      buttonsState.find((button) => button.id === selectedButtonId) || null;
+    const renderButtonEditor = (button: ButtonsNodeButton) => (
+      <div className={styles.buttonsNodeEditor}>
+        <Typography.Text className={styles.buttonsNodeEditorTitle}>
+          Button
+        </Typography.Text>
+        <ValueInput
+          ref={(instance) => {
+            if (instance) {
+              buttonLabelRefs.current[button.id] = instance;
+            } else {
+              delete buttonLabelRefs.current[button.id];
+            }
+          }}
+          value={button.label}
+          onChange={(value) =>
+            updateButtonLocal(button.id, { label: value })
+          }
+          onBlur={() => persistButtons()}
+          onPressEnter={() => {
+            persistButtons();
+            setActiveButtonId(null);
+          }}
+          placeholder="Enter button label or {variable}"
+          size="large"
+        />
+        <div className={styles.buttonsNodeMatchRow}>
+          <span className={styles.buttonsNodeMatchLabel}>Match type</span>
+          <Select
+            value={button.matchType}
+            onChange={(value: ButtonMatchType) =>
+              updateButtonLocal(button.id, { matchType: value }, { persist: true })
+            }
+            options={[
+              { value: "exact", label: "Match exact" },
+              { value: "any", label: "Match any" },
+            ]}
+            className={styles.buttonsNodeMatchSelect}
+          />
+        </div>
+      </div>
+    );
 
     const rawNoMatch = selectedNode.data.noMatch as
       | ButtonsFallbackConfig
@@ -3837,64 +3945,44 @@ export default function PropertiesPanel({
             </Typography.Text>
           )}
           {buttonsState.map((button) => {
-            const isActive = selectedButtonId === button.id;
+            const isActive = activeButtonId === button.id;
             const displayLabel = button.label.trim() || "New button (inactive)";
             return (
-              <div
+              <Popover
                 key={button.id}
-                className={`${styles.buttonsNodeListItem} ${
-                  isActive ? styles.buttonsNodeListItemActive : ""
-                } ${
-                  button.label.trim() ? "" : styles.buttonsNodeListItemInactive
-                }`}
-                onClick={() => setSelectedButtonId(button.id)}
+                trigger={["click"]}
+                destroyTooltipOnHide
+                placement="left"
+                overlayClassName={styles.buttonsNodePopover}
+                open={isActive}
+                onOpenChange={handleButtonPopoverOpenChange(button.id)}
+                content={renderButtonEditor(button)}
               >
-                <span className={styles.buttonsNodeListLabel}>
-                  {displayLabel}
-                </span>
-                <Button
-                  type="text"
-                  icon={<MinusOutlined />}
-                  className={styles.buttonsNodeListRemove}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    removeButton(button.id);
-                  }}
-                />
-              </div>
+                <div
+                  className={`${styles.buttonsNodeListItem} ${
+                    isActive ? styles.buttonsNodeListItemActive : ""
+                  } ${
+                    button.label.trim() ? "" : styles.buttonsNodeListItemInactive
+                  }`}
+                >
+                  <span className={styles.buttonsNodeListLabel}>
+                    {displayLabel}
+                  </span>
+                  <Button
+                    type="text"
+                    icon={<MinusOutlined />}
+                    className={styles.buttonsNodeListRemove}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      removeButton(button.id);
+                    }}
+                    onMouseDown={(event) => event.stopPropagation()}
+                  />
+                </div>
+              </Popover>
             );
           })}
         </div>
-
-        {selectedButton && (
-          <div className={styles.buttonsNodeEditor}>
-            <Typography.Text className={styles.buttonsNodeEditorTitle}>
-              Button
-            </Typography.Text>
-            <ValueInput
-              value={selectedButton.label}
-              onChange={(value) =>
-                updateButton(selectedButton.id, { label: value })
-              }
-              placeholder="Enter button label or {variable}"
-              size="large"
-            />
-            <div className={styles.buttonsNodeMatchRow}>
-              <span className={styles.buttonsNodeMatchLabel}>Match type</span>
-              <Select
-                value={selectedButton.matchType}
-                onChange={(value: ButtonMatchType) =>
-                  updateButton(selectedButton.id, { matchType: value })
-                }
-                options={[
-                  { value: "exact", label: "Match exact" },
-                  { value: "any", label: "Match any" },
-                ]}
-                className={styles.buttonsNodeMatchSelect}
-              />
-            </div>
-          </div>
-        )}
 
         <Divider className={styles.buttonsNodeDivider} />
 
