@@ -3821,7 +3821,7 @@ export default function PropertiesPanel({
         <div className={styles.buttonsFallbackList}>
           <Popover
             trigger={["click"]}
-            destroyTooltipOnHide
+            destroyOnHidden
             placement="left"
             overlayClassName={styles.buttonsFallbackPopover}
             open={fallbackPopover === "noMatch"}
@@ -3855,7 +3855,7 @@ export default function PropertiesPanel({
 
           <Popover
             trigger={["click"]}
-            destroyTooltipOnHide
+            destroyOnHidden
             placement="left"
             overlayClassName={styles.buttonsFallbackPopover}
             open={fallbackPopover === "noReply"}

@@ -502,6 +502,15 @@ const RichTextEditor = React.forwardRef<
     updateFormatState();
   }, [showVariableDropdown, updateVariableDropdownPosition, updateFormatState]);
 
+  const handleToolbarMouseDown = useCallback(
+    (event: React.MouseEvent<HTMLElement>) => {
+      event.preventDefault();
+      focusEditor();
+      saveSelection();
+    },
+    [focusEditor, saveSelection]
+  );
+
   const applyLink = useCallback(() => {
     if (!linkUrl.trim() || !linkLabel.trim()) return;
     focusEditor();
@@ -576,7 +585,7 @@ const RichTextEditor = React.forwardRef<
             <Button
               type="text"
               icon={<BoldOutlined />}
-              onMouseDown={(event) => event.preventDefault()}
+              onMouseDown={handleToolbarMouseDown}
               onClick={() => applyCommand("bold")}
               className={clsx(styles.toolbarButton, {
                 [styles.toolbarButtonActive]: formatState.bold,
@@ -588,7 +597,7 @@ const RichTextEditor = React.forwardRef<
             <Button
               type="text"
               icon={<ItalicOutlined />}
-              onMouseDown={(event) => event.preventDefault()}
+              onMouseDown={handleToolbarMouseDown}
               onClick={() => applyCommand("italic")}
               className={clsx(styles.toolbarButton, {
                 [styles.toolbarButtonActive]: formatState.italic,
@@ -600,7 +609,7 @@ const RichTextEditor = React.forwardRef<
             <Button
               type="text"
               icon={<UnderlineOutlined />}
-              onMouseDown={(event) => event.preventDefault()}
+              onMouseDown={handleToolbarMouseDown}
               onClick={() => applyCommand("underline")}
               className={clsx(styles.toolbarButton, {
                 [styles.toolbarButtonActive]: formatState.underline,
@@ -612,7 +621,7 @@ const RichTextEditor = React.forwardRef<
             <Button
               type="text"
               icon={<StrikethroughOutlined />}
-              onMouseDown={(event) => event.preventDefault()}
+              onMouseDown={handleToolbarMouseDown}
               onClick={() => applyCommand("strikeThrough")}
               className={clsx(styles.toolbarButton, {
                 [styles.toolbarButtonActive]: formatState.strikeThrough,
@@ -665,7 +674,7 @@ const RichTextEditor = React.forwardRef<
               <Button
                 type="text"
                 icon={<LinkOutlined />}
-                onMouseDown={(event) => event.preventDefault()}
+                onMouseDown={handleToolbarMouseDown}
                 className={styles.toolbarButton}
                 size="small"
               />
@@ -676,7 +685,7 @@ const RichTextEditor = React.forwardRef<
             <Button
               type="text"
               icon={<AimOutlined />}
-              onMouseDown={(event) => event.preventDefault()}
+              onMouseDown={handleToolbarMouseDown}
               onClick={() => {
                 setTimeout(() => {
                   focusEditor();
