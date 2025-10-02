@@ -107,6 +107,7 @@ interface ButtonsFallbackConfig {
   reprompts: string[];
   inactivityTimeout?: number;
   followPath?: boolean;
+  pathLabel?: string;
 }
 
 const escapeHtml = (value: string) =>
@@ -139,6 +140,7 @@ const ensureFallbackReprompts = (
   return {
     ...config,
     reprompts,
+    pathLabel: typeof config.pathLabel === "string" ? config.pathLabel : "",
   };
 };
 
@@ -153,6 +155,9 @@ const fallbackConfigsEqual = (
     typeof b.inactivityTimeout === "number" ? b.inactivityTimeout : null;
   if (timeoutA !== timeoutB) return false;
   if (!!a.followPath !== !!b.followPath) return false;
+  const pathLabelA = `${a.pathLabel ?? ""}`.trim();
+  const pathLabelB = `${b.pathLabel ?? ""}`.trim();
+  if (pathLabelA !== pathLabelB) return false;
 
   const repromptsA = ensureFallbackReprompts(a).reprompts;
   const repromptsB = ensureFallbackReprompts(b).reprompts;
@@ -366,6 +371,12 @@ const normalizeFallbackConfig = (
       typeof fallback?.followPath === "boolean"
         ? fallback.followPath
         : defaults?.followPath,
+    pathLabel:
+      typeof fallback?.pathLabel === "string"
+        ? fallback.pathLabel
+        : typeof defaults?.pathLabel === "string"
+        ? defaults.pathLabel
+        : undefined,
   };
 };
 
@@ -3517,7 +3528,11 @@ export default function PropertiesPanel({
     const renderRepromptEditor = (
       draft: ButtonsFallbackConfig,
       setDraft: React.Dispatch<React.SetStateAction<ButtonsFallbackConfig>>,
-      options?: { showInactivity?: boolean }
+      options: {
+        showInactivity?: boolean;
+        followPathLabel?: string;
+        context: "noMatch" | "noReply";
+      }
     ) => {
       const safeDraft = ensureFallbackReprompts(draft);
 
@@ -3536,6 +3551,25 @@ export default function PropertiesPanel({
           ...current,
           reprompts: [...current.reprompts, ""],
         }));
+      };
+
+      const handleGenerateReprompts = (count: number) => {
+        if (!Number.isFinite(count) || count <= 0) return;
+        updateDraft((current) => {
+          const ensuredCurrent = ensureFallbackReprompts(current);
+          let nextReprompts = ensuredCurrent.reprompts.slice(0, count);
+          if (nextReprompts.length < count) {
+            nextReprompts = [
+              ...nextReprompts,
+              ...Array(count - nextReprompts.length).fill(""),
+            ];
+          }
+          return {
+            ...ensuredCurrent,
+            reprompts: nextReprompts,
+          };
+        });
+        setEditingRepromptIndex(count - 1);
       };
 
       const handleRemoveReprompt = (index: number) => {
@@ -3654,27 +3688,76 @@ export default function PropertiesPanel({
               );
             })}
           </div>
-          <Button
-            type="dashed"
-            icon={<PlusOutlined />}
-            onClick={handleAddReprompt}
-            className={styles.buttonsRepromptAdd}
-          >
-            Add reprompt
-          </Button>
-          {options?.showInactivity && (
-            <div className={styles.buttonsFallbackFieldRow}>
-              <span className={styles.buttonsFallbackFieldLabel}>
-                Follow path after reprompts?
-              </span>
-              <Switch
-                checked={!!safeDraft.followPath}
-                onChange={(checked) =>
-                  updateDraft((current) => ({
-                    ...current,
+          <div className={styles.buttonsRepromptActions}>
+            <Dropdown
+              trigger={["click"]}
+              overlayClassName={styles.buttonsRepromptGenerateMenu}
+              menu={{
+                items: [
+                  { key: "1", label: "Generate 1 variant" },
+                  { key: "3", label: "Generate 3 variants" },
+                  { key: "5", label: "Generate 5 variants" },
+                ],
+                onClick: ({ key }) => {
+                  const parsed = Number.parseInt(key, 10);
+                  handleGenerateReprompts(Number.isNaN(parsed) ? 0 : parsed);
+                },
+              }}
+            >
+              <Button className={styles.buttonsRepromptGenerate}>
+                <span className={styles.buttonsRepromptGenerateIcon}>✨</span>
+                Generate
+                <DownOutlined className={styles.buttonsRepromptGenerateCaret} />
+              </Button>
+            </Dropdown>
+            <Button
+              type="dashed"
+              icon={<PlusOutlined />}
+              onClick={handleAddReprompt}
+              className={styles.buttonsRepromptAdd}
+            >
+              Add reprompt
+            </Button>
+          </div>
+          <div className={styles.buttonsFollowPathRow}>
+            <span className={styles.buttonsFollowPathLabel}>
+              Follow path after reprompts?
+            </span>
+            <Switch
+              checked={!!safeDraft.followPath}
+              onChange={(checked) =>
+                updateDraft((current) => {
+                  const ensuredCurrent = ensureFallbackReprompts(current);
+                  return {
+                    ...ensuredCurrent,
                     followPath: checked,
-                  }))
+                    pathLabel: checked
+                      ? ensuredCurrent.pathLabel?.trim()
+                        ? ensuredCurrent.pathLabel
+                        : options.followPathLabel || ""
+                      : ensuredCurrent.pathLabel,
+                  };
+                })
+              }
+            />
+          </div>
+          {safeDraft.followPath && (
+            <div className={styles.buttonsPathLabelCard}>
+              <span className={styles.buttonsPathLabelTitle}>Path label</span>
+              <Input
+                value={safeDraft.pathLabel || ""}
+                onChange={(event) => {
+                  const { value } = event.target;
+                  updateDraft((current) => ({
+                    ...ensureFallbackReprompts(current),
+                    pathLabel: value,
+                  }));
+                }}
+                placeholder={
+                  options.followPathLabel ||
+                  `Enter ${options.context === "noMatch" ? "no match" : "no reply"} label`
                 }
+                className={styles.buttonsPathLabelInput}
               />
             </div>
           )}
@@ -3826,7 +3909,10 @@ export default function PropertiesPanel({
             overlayClassName={styles.buttonsFallbackPopover}
             open={fallbackPopover === "noMatch"}
             onOpenChange={handleFallbackOpenChange("noMatch")}
-            content={renderRepromptEditor(draftNoMatch, setDraftNoMatch)}
+            content={renderRepromptEditor(draftNoMatch, setDraftNoMatch, {
+              context: "noMatch",
+              followPathLabel: "No match",
+            })}
           >
             <div
               className={`${styles.buttonsFallbackItem} ${
@@ -3862,6 +3948,8 @@ export default function PropertiesPanel({
             onOpenChange={handleFallbackOpenChange("noReply")}
             content={renderRepromptEditor(draftNoReply, setDraftNoReply, {
               showInactivity: true,
+              context: "noReply",
+              followPathLabel: "No reply",
             })}
           >
             <div

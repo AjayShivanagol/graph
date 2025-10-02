@@ -19,6 +19,7 @@ interface ButtonsFallbackConfig {
   reprompts?: string[];
   inactivityTimeout?: number;
   followPath?: boolean;
+  pathLabel?: string;
 }
 
 interface ButtonsNodeData {

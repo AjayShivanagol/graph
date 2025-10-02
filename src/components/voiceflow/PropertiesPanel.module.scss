@@ -1618,12 +1618,13 @@
 }
 
 .buttonsRepromptAdd {
-  align-self: flex-start;
   border-radius: 10px;
   border: 1px dashed #d1d5db !important;
   background: #f8fafc;
   font-weight: 600;
   color: #334155;
+  height: 40px;
+  flex: 1;
 
   &:hover,
   &:focus {
@@ -1631,6 +1632,91 @@
     color: #2563eb;
     background: #eef4ff;
   }
+}
+
+.buttonsRepromptActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.buttonsRepromptGenerate {
+  flex: 1;
+  height: 40px;
+  border-radius: 12px !important;
+  background: linear-gradient(135deg, #2563eb, #4338ca);
+  color: #ffffff;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 10px 18px rgba(37, 99, 235, 0.2);
+  border: none;
+
+  &:hover,
+  &:focus {
+    background: linear-gradient(135deg, #1d4ed8, #3730a3);
+    color: #ffffff;
+  }
+}
+
+.buttonsRepromptGenerateIcon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.buttonsRepromptGenerateCaret {
+  font-size: 12px;
+}
+
+.buttonsRepromptGenerateMenu {
+  :global(.ant-dropdown-menu) {
+    border-radius: 12px;
+    padding: 8px 0;
+  }
+
+  :global(.ant-dropdown-menu-item) {
+    font-weight: 500;
+  }
+}
+
+.buttonsFollowPathRow {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.buttonsFollowPathLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+}
+
+.buttonsPathLabelCard {
+  margin-top: 12px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.buttonsPathLabelTitle {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.04em;
+}
+
+.buttonsPathLabelInput {
+  border-radius: 10px;
 }
 
 .buttonsLinkPopover {
