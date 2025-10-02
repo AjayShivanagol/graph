@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Input, Popover, Space, Tooltip } from "antd";
+import type { InputRef } from "antd";
 import {
   AimOutlined,
   BoldOutlined,
@@ -175,6 +176,8 @@ const RichTextEditor = React.forwardRef<
   const selectionRef = useRef<Range | null>(null);
   const skipSyncRef = useRef(false);
   const variableAnchorRef = useRef<Range | null>(null);
+  const linkLabelInputRef = useRef<InputRef | null>(null);
+  const linkUrlInputRef = useRef<InputRef | null>(null);
 
   const variables = useAppSelector((state) => state.variables?.list || []);
 
@@ -248,6 +251,14 @@ const RichTextEditor = React.forwardRef<
     selectionRef.current = range.cloneRange();
     updateFormatState();
   }, [updateFormatState]);
+
+  const captureSelection = useCallback(() => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+    if (!editorRef.current?.contains(range.commonAncestorContainer)) return;
+    selectionRef.current = range.cloneRange();
+  }, []);
 
   const restoreSelection = useCallback(() => {
     const range = selectionRef.current;
@@ -502,29 +513,123 @@ const RichTextEditor = React.forwardRef<
     updateFormatState();
   }, [showVariableDropdown, updateVariableDropdownPosition, updateFormatState]);
 
+  const handleToolbarMouseDown = useCallback(
+    (event: React.MouseEvent<HTMLElement>) => {
+      event.preventDefault();
+      captureSelection();
+    },
+    [captureSelection]
+  );
+
+  const handleToolbarKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLElement>) => {
+      if (event.key === " ") {
+        event.preventDefault();
+        captureSelection();
+      }
+
+      if (event.key === "Enter") {
+        captureSelection();
+      }
+    },
+    [captureSelection]
+  );
+
+  const getSelectionAnchor = useCallback(() => {
+    const range = selectionRef.current;
+    if (!range) return null;
+
+    let node: Node | null = range.commonAncestorContainer;
+    while (node && node !== editorRef.current) {
+      if (node instanceof HTMLAnchorElement) {
+        return node;
+      }
+      node = node.parentNode;
+    }
+    return null;
+  }, []);
+
+  useEffect(() => {
+    if (!showLinkPopover) {
+      setLinkLabel("");
+      setLinkUrl("");
+      linkLabelInputRef.current = null;
+      linkUrlInputRef.current = null;
+      return;
+    }
+
+    const anchor = getSelectionAnchor();
+    if (anchor) {
+      setLinkUrl(anchor.getAttribute("href") || "");
+      setLinkLabel(anchor.textContent || "");
+    } else {
+      const range = selectionRef.current;
+      if (range && !range.collapsed) {
+        setLinkLabel(range.toString());
+      }
+    }
+
+    const focusInputs = () => {
+      if (linkLabelInputRef.current) {
+        linkLabelInputRef.current.focus();
+        linkLabelInputRef.current.select();
+      } else {
+        linkUrlInputRef.current?.focus();
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      window.requestAnimationFrame(focusInputs);
+    } else {
+      focusInputs();
+    }
+  }, [getSelectionAnchor, showLinkPopover]);
+
+  const keepLinkPopoverOpen = useCallback((event: React.MouseEvent) => {
+    event.stopPropagation();
+  }, []);
+
   const applyLink = useCallback(() => {
-    if (!linkUrl.trim() || !linkLabel.trim()) return;
+    const trimmedLabel = linkLabel.trim();
+    const trimmedUrl = linkUrl.trim();
+    if (!trimmedLabel || !trimmedUrl) return;
+
     focusEditor();
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return;
 
-    const range = selection.getRangeAt(0).cloneRange();
-    range.deleteContents();
+    const existingAnchor = getSelectionAnchor();
 
-    const anchor = document.createElement("a");
-    anchor.href = linkUrl.trim();
-    anchor.target = "_blank";
-    anchor.rel = "noopener noreferrer";
-    anchor.textContent = linkLabel.trim();
+    if (existingAnchor) {
+      existingAnchor.textContent = trimmedLabel;
+      existingAnchor.setAttribute("href", trimmedUrl);
 
-    range.insertNode(anchor);
+      const after = document.createRange();
+      after.setStartAfter(existingAnchor);
+      after.collapse(true);
 
-    const after = document.createRange();
-    after.setStartAfter(anchor);
-    after.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(after);
+    } else {
+      const range = selection.getRangeAt(0).cloneRange();
+      range.deleteContents();
 
-    selection.removeAllRanges();
-    selection.addRange(after);
+      const anchor = document.createElement("a");
+      anchor.href = trimmedUrl;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      anchor.textContent = trimmedLabel;
+
+      range.insertNode(anchor);
+
+      const after = document.createRange();
+      after.setStartAfter(anchor);
+      after.collapse(true);
+
+      selection.removeAllRanges();
+      selection.addRange(after);
+    }
+
     saveSelection();
 
     if (editorRef.current) {
@@ -535,7 +640,16 @@ const RichTextEditor = React.forwardRef<
     setLinkUrl("");
     setLinkLabel("");
     setShowLinkPopover(false);
-  }, [emitChange, focusEditor, linkLabel, linkUrl, saveSelection]);
+    updateFormatState();
+  }, [
+    emitChange,
+    focusEditor,
+    getSelectionAnchor,
+    linkLabel,
+    linkUrl,
+    saveSelection,
+    updateFormatState,
+  ]);
 
   const renderVariableDropdown = () => {
     if (!showVariableDropdown || filteredVariables.length === 0) return null;
@@ -576,7 +690,8 @@ const RichTextEditor = React.forwardRef<
             <Button
               type="text"
               icon={<BoldOutlined />}
-              onMouseDown={(event) => event.preventDefault()}
+              onMouseDown={handleToolbarMouseDown}
+              onKeyDown={handleToolbarKeyDown}
               onClick={() => applyCommand("bold")}
               className={clsx(styles.toolbarButton, {
                 [styles.toolbarButtonActive]: formatState.bold,
@@ -588,7 +703,8 @@ const RichTextEditor = React.forwardRef<
             <Button
               type="text"
               icon={<ItalicOutlined />}
-              onMouseDown={(event) => event.preventDefault()}
+              onMouseDown={handleToolbarMouseDown}
+              onKeyDown={handleToolbarKeyDown}
               onClick={() => applyCommand("italic")}
               className={clsx(styles.toolbarButton, {
                 [styles.toolbarButtonActive]: formatState.italic,
@@ -600,7 +716,8 @@ const RichTextEditor = React.forwardRef<
             <Button
               type="text"
               icon={<UnderlineOutlined />}
-              onMouseDown={(event) => event.preventDefault()}
+              onMouseDown={handleToolbarMouseDown}
+              onKeyDown={handleToolbarKeyDown}
               onClick={() => applyCommand("underline")}
               className={clsx(styles.toolbarButton, {
                 [styles.toolbarButtonActive]: formatState.underline,
@@ -612,7 +729,8 @@ const RichTextEditor = React.forwardRef<
             <Button
               type="text"
               icon={<StrikethroughOutlined />}
-              onMouseDown={(event) => event.preventDefault()}
+              onMouseDown={handleToolbarMouseDown}
+              onKeyDown={handleToolbarKeyDown}
               onClick={() => applyCommand("strikeThrough")}
               className={clsx(styles.toolbarButton, {
                 [styles.toolbarButtonActive]: formatState.strikeThrough,
@@ -624,15 +742,28 @@ const RichTextEditor = React.forwardRef<
           <Popover
             trigger="click"
             open={showLinkPopover}
-            onOpenChange={(open) => setShowLinkPopover(open)}
+            onOpenChange={(open) => {
+              if (open) {
+                captureSelection();
+              }
+              setShowLinkPopover(open);
+            }}
             placement="bottomLeft"
             overlayClassName={styles.linkPopover}
+            destroyOnHidden
             content={
-              <div className={styles.linkPopoverContent}>
+              <div
+                className={styles.linkPopoverContent}
+                onMouseDown={keepLinkPopoverOpen}
+                onClick={keepLinkPopoverOpen}
+              >
                 <Input
                   placeholder="Link text"
                   value={linkLabel}
                   onChange={(event) => setLinkLabel(event.target.value)}
+                  ref={(instance) => {
+                    linkLabelInputRef.current = instance;
+                  }}
                   style={{ marginBottom: 8, height: 38 }}
                 />
                 <Input
@@ -644,6 +775,9 @@ const RichTextEditor = React.forwardRef<
                       ? undefined
                       : "error"
                   }
+                  ref={(instance) => {
+                    linkUrlInputRef.current = instance;
+                  }}
                   style={{ marginBottom: 12, height: 38 }}
                 />
                 <Button
@@ -665,7 +799,8 @@ const RichTextEditor = React.forwardRef<
               <Button
                 type="text"
                 icon={<LinkOutlined />}
-                onMouseDown={(event) => event.preventDefault()}
+                onMouseDown={handleToolbarMouseDown}
+                onKeyDown={handleToolbarKeyDown}
                 className={styles.toolbarButton}
                 size="small"
               />
@@ -676,7 +811,8 @@ const RichTextEditor = React.forwardRef<
             <Button
               type="text"
               icon={<AimOutlined />}
-              onMouseDown={(event) => event.preventDefault()}
+              onMouseDown={handleToolbarMouseDown}
+              onKeyDown={handleToolbarKeyDown}
               onClick={() => {
                 setTimeout(() => {
                   focusEditor();
