@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Input, Popover, Space, Tooltip } from "antd";
+import { Button, Input, Space, Tooltip } from "antd";
 import {
   AimOutlined,
   BoldOutlined,
@@ -10,6 +10,7 @@ import {
 } from "@ant-design/icons";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
+import type { InputRef } from "antd/es/input";
 import { useAppSelector } from "../../store/hooks";
 import styles from "./RichTextEditor.module.scss";
 
@@ -175,6 +176,10 @@ const RichTextEditor = React.forwardRef<
   const selectionRef = useRef<Range | null>(null);
   const skipSyncRef = useRef(false);
   const variableAnchorRef = useRef<Range | null>(null);
+  const linkButtonRef = useRef<HTMLButtonElement | null>(null);
+  const linkPopoverRef = useRef<HTMLDivElement | null>(null);
+  const linkLabelInputRef = useRef<InputRef | null>(null);
+  const linkUrlInputRef = useRef<InputRef | null>(null);
 
   const variables = useAppSelector((state) => state.variables?.list || []);
 
@@ -191,6 +196,12 @@ const RichTextEditor = React.forwardRef<
     width: 240,
   });
   const [formatState, setFormatState] = useState(initialFormatState);
+  const [linkPopoverPosition, setLinkPopoverPosition] = useState(() => ({
+    top: 0,
+    left: 0,
+  }));
+
+  const linkPopoverWidth = 260;
 
   const syncEditorHtml = useCallback((markdown: string) => {
     if (!editorRef.current) return;
@@ -208,43 +219,85 @@ const RichTextEditor = React.forwardRef<
     syncEditorHtml(value || "");
   }, [value, syncEditorHtml]);
 
-  const updateFormatState = useCallback(() => {
-    if (typeof document === "undefined") return;
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0 || !editorRef.current) {
-      setFormatState(initialFormatState());
-      return;
-    }
-    const range = selection.getRangeAt(0);
-    if (!editorRef.current.contains(range.commonAncestorContainer)) {
-      setFormatState(initialFormatState());
-      return;
-    }
+  const queryCommandStateForRange = useCallback(
+    (command: FormatCommand, range?: Range | null) => {
+      if (typeof document === "undefined") return false;
+      const selection = window.getSelection();
+      if (!selection) return false;
 
-    const query = (command: FormatCommand) => {
-      try {
-        return document.queryCommandState(command) ?? false;
-      } catch (error) {
-        return false;
+      let previousRanges: Range[] | null = null;
+      if (range) {
+        previousRanges = [];
+        for (let index = 0; index < selection.rangeCount; index += 1) {
+          previousRanges.push(selection.getRangeAt(index).cloneRange());
+        }
+        selection.removeAllRanges();
+        selection.addRange(range);
       }
-    };
 
-    setFormatState({
-      bold: query("bold"),
-      italic: query("italic"),
-      underline: query("underline"),
-      strikeThrough: query("strikeThrough"),
-    });
-  }, []);
+      let result = false;
+      try {
+        result = document.queryCommandState(command) ?? false;
+      } catch (error) {
+        result = false;
+      }
+
+      if (previousRanges) {
+        selection.removeAllRanges();
+        previousRanges.forEach((prevRange) => selection.addRange(prevRange));
+      }
+
+      return result;
+    },
+    []
+  );
+
+  const updateFormatState = useCallback(
+    (range?: Range | null) => {
+      if (!editorRef.current) {
+        setFormatState(initialFormatState());
+        return;
+      }
+
+      const selection = window.getSelection();
+      const liveRange =
+        range ||
+        (selection && selection.rangeCount > 0
+          ? selection.getRangeAt(0)
+          : null);
+
+      if (!liveRange || !editorRef.current.contains(liveRange.commonAncestorContainer)) {
+        if (selectionRef.current) {
+          setFormatState({
+            bold: queryCommandStateForRange("bold", selectionRef.current),
+            italic: queryCommandStateForRange("italic", selectionRef.current),
+            underline: queryCommandStateForRange("underline", selectionRef.current),
+            strikeThrough: queryCommandStateForRange(
+              "strikeThrough",
+              selectionRef.current
+            ),
+          });
+        } else {
+          setFormatState(initialFormatState());
+        }
+        return;
+      }
+
+      setFormatState({
+        bold: queryCommandStateForRange("bold"),
+        italic: queryCommandStateForRange("italic"),
+        underline: queryCommandStateForRange("underline"),
+        strikeThrough: queryCommandStateForRange("strikeThrough"),
+      });
+    },
+    [queryCommandStateForRange]
+  );
 
   const saveSelection = useCallback(() => {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return;
     const range = selection.getRangeAt(0);
-    if (!editorRef.current?.contains(range.commonAncestorContainer)) {
-      setFormatState(initialFormatState());
-      return;
-    }
+    if (!editorRef.current?.contains(range.commonAncestorContainer)) return;
     selectionRef.current = range.cloneRange();
     updateFormatState();
   }, [updateFormatState]);
@@ -499,32 +552,149 @@ const RichTextEditor = React.forwardRef<
     if (showVariableDropdown) {
       updateVariableDropdownPosition();
     }
-    updateFormatState();
-  }, [showVariableDropdown, updateVariableDropdownPosition, updateFormatState]);
+    saveSelection();
+  }, [saveSelection, showVariableDropdown, updateVariableDropdownPosition]);
+
+  const handleMouseUp = useCallback(() => {
+    saveSelection();
+  }, [saveSelection]);
+
+  const handleToolbarMouseDown = useCallback(
+    (event: React.MouseEvent<HTMLElement>) => {
+      event.preventDefault();
+      focusEditor();
+      saveSelection();
+    },
+    [focusEditor, saveSelection]
+  );
+
+  const findAnchorInRange = useCallback(
+    (range: Range | null) => {
+      if (!range || !editorRef.current) return null;
+
+      const findAncestor = (node: Node | null): HTMLAnchorElement | null => {
+        let current: Node | null = node;
+        while (current && current !== editorRef.current) {
+          if (current instanceof HTMLAnchorElement) {
+            return current;
+          }
+          current = current.parentNode;
+        }
+        return null;
+      };
+
+      return (
+        findAncestor(range.commonAncestorContainer) ||
+        findAncestor(range.startContainer) ||
+        findAncestor(range.endContainer)
+      );
+    },
+    []
+  );
+
+  const closeLinkPopover = useCallback(() => {
+    setShowLinkPopover(false);
+    setLinkLabel("");
+    setLinkUrl("");
+  }, []);
+
+  const updateLinkPopoverPosition = useCallback(() => {
+    if (typeof window === "undefined" || !linkButtonRef.current) return;
+
+    const rect = linkButtonRef.current.getBoundingClientRect();
+    const scrollX = window.scrollX || window.pageXOffset;
+    const scrollY = window.scrollY || window.pageYOffset;
+    const viewportRight = scrollX + window.innerWidth;
+    const horizontalPadding = 12;
+    const desiredLeft =
+      rect.left + scrollX - (linkPopoverWidth - rect.width) / 2;
+    const minLeft = scrollX + horizontalPadding;
+    const maxLeft = Math.max(
+      minLeft,
+      viewportRight - horizontalPadding - linkPopoverWidth
+    );
+    const constrainedLeft = Math.min(
+      Math.max(desiredLeft, minLeft),
+      maxLeft
+    );
+
+    setLinkPopoverPosition({
+      top: rect.bottom + scrollY + 8,
+      left: constrainedLeft,
+    });
+  }, [linkPopoverWidth]);
+
+  const openLinkPopover = useCallback(() => {
+    if (showLinkPopover) {
+      closeLinkPopover();
+      return;
+    }
+
+    saveSelection();
+    const range = selectionRef.current;
+    const existingAnchor = findAnchorInRange(range);
+
+    if (existingAnchor) {
+      setLinkLabel(existingAnchor.textContent || "");
+      setLinkUrl(existingAnchor.getAttribute("href") || "");
+    } else if (range) {
+      const selectedText = range.toString();
+      setLinkLabel(selectedText || "");
+      setLinkUrl("");
+    } else {
+      setLinkLabel("");
+      setLinkUrl("");
+    }
+
+    updateLinkPopoverPosition();
+    setShowLinkPopover(true);
+  }, [
+    closeLinkPopover,
+    findAnchorInRange,
+    saveSelection,
+    showLinkPopover,
+    updateLinkPopoverPosition,
+  ]);
 
   const applyLink = useCallback(() => {
-    if (!linkUrl.trim() || !linkLabel.trim()) return;
+    const trimmedUrl = linkUrl.trim();
+    const trimmedLabel = linkLabel.trim();
+    if (!trimmedUrl || !trimmedLabel) return;
+
     focusEditor();
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return;
 
-    const range = selection.getRangeAt(0).cloneRange();
-    range.deleteContents();
+    const workingRange = selection.getRangeAt(0).cloneRange();
+    const anchor = findAnchorInRange(selectionRef.current || workingRange);
 
-    const anchor = document.createElement("a");
-    anchor.href = linkUrl.trim();
-    anchor.target = "_blank";
-    anchor.rel = "noopener noreferrer";
-    anchor.textContent = linkLabel.trim();
+    if (anchor) {
+      anchor.href = trimmedUrl;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      anchor.textContent = trimmedLabel;
 
-    range.insertNode(anchor);
+      const after = document.createRange();
+      after.setStartAfter(anchor);
+      after.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(after);
+    } else {
+      workingRange.deleteContents();
+      const anchorElement = document.createElement("a");
+      anchorElement.href = trimmedUrl;
+      anchorElement.target = "_blank";
+      anchorElement.rel = "noopener noreferrer";
+      anchorElement.textContent = trimmedLabel;
+      workingRange.insertNode(anchorElement);
 
-    const after = document.createRange();
-    after.setStartAfter(anchor);
-    after.collapse(true);
+      const after = document.createRange();
+      after.setStartAfter(anchorElement);
+      after.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(after);
+    }
 
-    selection.removeAllRanges();
-    selection.addRange(after);
     saveSelection();
 
     if (editorRef.current) {
@@ -532,10 +702,89 @@ const RichTextEditor = React.forwardRef<
       emitChange(htmlToMarkdown(html));
     }
 
-    setLinkUrl("");
-    setLinkLabel("");
-    setShowLinkPopover(false);
-  }, [emitChange, focusEditor, linkLabel, linkUrl, saveSelection]);
+    updateFormatState(selectionRef.current);
+    closeLinkPopover();
+  }, [
+    closeLinkPopover,
+    emitChange,
+    findAnchorInRange,
+    focusEditor,
+    linkLabel,
+    linkUrl,
+    saveSelection,
+    updateFormatState,
+  ]);
+
+  useEffect(() => {
+    if (!showLinkPopover) return;
+    updateLinkPopoverPosition();
+  }, [showLinkPopover, updateLinkPopoverPosition]);
+
+  useEffect(() => {
+    if (!showLinkPopover) return;
+
+    const handleResize = () => updateLinkPopoverPosition();
+    const handleScroll = () => updateLinkPopoverPosition();
+
+    window.addEventListener("resize", handleResize);
+    document.addEventListener("scroll", handleScroll, true);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      document.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [showLinkPopover, updateLinkPopoverPosition]);
+
+  useEffect(() => {
+    if (!showLinkPopover) return;
+
+    const handleMouseDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        linkPopoverRef.current?.contains(target) ||
+        linkButtonRef.current?.contains(target)
+      ) {
+        return;
+      }
+      closeLinkPopover();
+    };
+
+    document.addEventListener("mousedown", handleMouseDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handleMouseDown);
+    };
+  }, [showLinkPopover, closeLinkPopover]);
+
+  useEffect(() => {
+    if (!showLinkPopover) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeLinkPopover();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showLinkPopover, closeLinkPopover]);
+
+  useEffect(() => {
+    if (!showLinkPopover) return;
+
+    const timer = window.setTimeout(() => {
+      linkLabelInputRef.current?.focus();
+      if (linkLabel) {
+        linkLabelInputRef.current?.select();
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [showLinkPopover, linkLabel]);
 
   const renderVariableDropdown = () => {
     if (!showVariableDropdown || filteredVariables.length === 0) return null;
@@ -568,6 +817,63 @@ const RichTextEditor = React.forwardRef<
     );
   };
 
+  const renderLinkPopover = () => {
+    if (!showLinkPopover) return null;
+
+    return createPortal(
+      <div
+        ref={linkPopoverRef}
+        className={styles.linkPopoverPanel}
+        style={{
+          top: linkPopoverPosition.top,
+          left: linkPopoverPosition.left,
+          width: linkPopoverWidth,
+        }}
+      >
+        <div className={styles.linkPopoverContent}>
+          <Input
+            ref={linkLabelInputRef}
+            placeholder="Link text"
+            value={linkLabel}
+            onChange={(event) => setLinkLabel(event.target.value)}
+            onPressEnter={(event) => {
+              event.preventDefault();
+              linkUrlInputRef.current?.focus();
+            }}
+            style={{ marginBottom: 8, height: 38 }}
+          />
+          <Input
+            ref={linkUrlInputRef}
+            placeholder="https://example.com"
+            value={linkUrl}
+            onChange={(event) => setLinkUrl(event.target.value)}
+            status={
+              !linkUrl || linkUrl.startsWith("https://") ? undefined : "error"
+            }
+            onPressEnter={(event) => {
+              event.preventDefault();
+              applyLink();
+            }}
+            style={{ marginBottom: 12, height: 38 }}
+          />
+          <Button
+            type="primary"
+            block
+            onClick={applyLink}
+            disabled={
+              !linkLabel.trim() ||
+              !linkUrl.trim() ||
+              !linkUrl.trim().startsWith("https://")
+            }
+          >
+            Insert link
+          </Button>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
   return (
     <div className={clsx(styles.richTextEditor, className)}>
       <div className={styles.toolbar}>
@@ -576,7 +882,7 @@ const RichTextEditor = React.forwardRef<
             <Button
               type="text"
               icon={<BoldOutlined />}
-              onMouseDown={(event) => event.preventDefault()}
+              onMouseDown={handleToolbarMouseDown}
               onClick={() => applyCommand("bold")}
               className={clsx(styles.toolbarButton, {
                 [styles.toolbarButtonActive]: formatState.bold,
@@ -588,7 +894,7 @@ const RichTextEditor = React.forwardRef<
             <Button
               type="text"
               icon={<ItalicOutlined />}
-              onMouseDown={(event) => event.preventDefault()}
+              onMouseDown={handleToolbarMouseDown}
               onClick={() => applyCommand("italic")}
               className={clsx(styles.toolbarButton, {
                 [styles.toolbarButtonActive]: formatState.italic,
@@ -600,7 +906,7 @@ const RichTextEditor = React.forwardRef<
             <Button
               type="text"
               icon={<UnderlineOutlined />}
-              onMouseDown={(event) => event.preventDefault()}
+              onMouseDown={handleToolbarMouseDown}
               onClick={() => applyCommand("underline")}
               className={clsx(styles.toolbarButton, {
                 [styles.toolbarButtonActive]: formatState.underline,
@@ -612,7 +918,7 @@ const RichTextEditor = React.forwardRef<
             <Button
               type="text"
               icon={<StrikethroughOutlined />}
-              onMouseDown={(event) => event.preventDefault()}
+              onMouseDown={handleToolbarMouseDown}
               onClick={() => applyCommand("strikeThrough")}
               className={clsx(styles.toolbarButton, {
                 [styles.toolbarButtonActive]: formatState.strikeThrough,
@@ -621,62 +927,25 @@ const RichTextEditor = React.forwardRef<
             />
           </Tooltip>
 
-          <Popover
-            trigger="click"
-            open={showLinkPopover}
-            onOpenChange={(open) => setShowLinkPopover(open)}
-            placement="bottomLeft"
-            overlayClassName={styles.linkPopover}
-            content={
-              <div className={styles.linkPopoverContent}>
-                <Input
-                  placeholder="Link text"
-                  value={linkLabel}
-                  onChange={(event) => setLinkLabel(event.target.value)}
-                  style={{ marginBottom: 8, height: 38 }}
-                />
-                <Input
-                  placeholder="https://example.com"
-                  value={linkUrl}
-                  onChange={(event) => setLinkUrl(event.target.value)}
-                  status={
-                    !linkUrl || linkUrl.startsWith("https://")
-                      ? undefined
-                      : "error"
-                  }
-                  style={{ marginBottom: 12, height: 38 }}
-                />
-                <Button
-                  type="primary"
-                  block
-                  onClick={applyLink}
-                  disabled={
-                    !linkLabel.trim() ||
-                    !linkUrl.trim() ||
-                    !linkUrl.trim().startsWith("https://")
-                  }
-                >
-                  Insert link
-                </Button>
-              </div>
-            }
-          >
-            <Tooltip title="Insert link">
-              <Button
-                type="text"
-                icon={<LinkOutlined />}
-                onMouseDown={(event) => event.preventDefault()}
-                className={styles.toolbarButton}
-                size="small"
-              />
-            </Tooltip>
-          </Popover>
+          <Tooltip title="Insert link">
+            <Button
+              ref={linkButtonRef}
+              type="text"
+              icon={<LinkOutlined />}
+              onMouseDown={handleToolbarMouseDown}
+              onClick={openLinkPopover}
+              className={clsx(styles.toolbarButton, {
+                [styles.toolbarButtonActive]: showLinkPopover,
+              })}
+              size="small"
+            />
+          </Tooltip>
 
           <Tooltip title="Insert variable">
             <Button
               type="text"
               icon={<AimOutlined />}
-              onMouseDown={(event) => event.preventDefault()}
+              onMouseDown={handleToolbarMouseDown}
               onClick={() => {
                 setTimeout(() => {
                   focusEditor();
@@ -726,8 +995,10 @@ const RichTextEditor = React.forwardRef<
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           onKeyUp={handleKeyUp}
+          onMouseUp={handleMouseUp}
         />
       </div>
+      {renderLinkPopover()}
       {renderVariableDropdown()}
     </div>
   );
