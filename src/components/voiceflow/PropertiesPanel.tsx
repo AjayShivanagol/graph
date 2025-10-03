@@ -3432,13 +3432,39 @@ export default function PropertiesPanel({
       });
     };
 
-    const addButton = () => {
+    const addButton = (afterId?: string) => {
+      if (buttonsStateRef.current.length >= 10) {
+        return;
+      }
+
       const newButton: ButtonsNodeButton = {
         id: generateButtonId(),
         label: "",
         matchType: "exact",
       };
-      const next = [...buttonsStateRef.current, newButton];
+
+      const current = buttonsStateRef.current;
+      const trimmed = afterId
+        ? current.map((button) =>
+            button.id === afterId
+              ? { ...button, label: button.label.trim() }
+              : button
+          )
+        : current.slice();
+
+      const insertIndex = afterId
+        ? trimmed.findIndex((button) => button.id === afterId)
+        : -1;
+
+      const next =
+        afterId && insertIndex >= 0
+          ? [
+              ...trimmed.slice(0, insertIndex + 1),
+              newButton,
+              ...trimmed.slice(insertIndex + 1),
+            ]
+          : [...trimmed, newButton];
+
       setButtonsState(next);
       buttonsStateRef.current = next;
       persistButtons(next);
@@ -3506,10 +3532,7 @@ export default function PropertiesPanel({
               type="default"
               className={styles.buttonsNodeAddAnother}
               disabled={isAddAnotherDisabled}
-              onClick={() => {
-                persistButtons();
-                addButton();
-              }}
+              onClick={() => addButton(button.id)}
             >
               Add another
             </Button>
@@ -4006,7 +4029,7 @@ export default function PropertiesPanel({
           <Button
             icon={<PlusOutlined />}
             type="text"
-            onClick={addButton}
+            onClick={() => addButton()}
             disabled={buttonsState.length >= 10}
             className={styles.buttonsNodeAdd}
           />
