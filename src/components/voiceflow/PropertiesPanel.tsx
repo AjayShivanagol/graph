@@ -3619,14 +3619,24 @@ export default function PropertiesPanel({
 
     return (
       <div className={styles.choiceProperties}>
-        <Typography.Text className={styles.sectionHeading}>
-          Choices
-        </Typography.Text>
+        <div className={styles.choiceHeaderRow}>
+          <Typography.Text className={styles.sectionHeading}>
+            Triggers
+          </Typography.Text>
+          <Button
+            icon={<PlusOutlined />}
+            type="text"
+            onClick={addChoice}
+            className={styles.choiceAddButton}
+          />
+        </div>
         <div className={styles.choiceList}>
           {choicesState.length === 0 ? (
-            <Typography.Text type="secondary" className={styles.choiceEmpty}>
-              No choices yet. Add one to branch your flow.
-            </Typography.Text>
+            <div
+              className={`${styles.choiceListItem} ${styles.choiceListItemEmpty}`}
+            >
+              <span className={styles.choiceEmptyLabel}>None</span>
+            </div>
           ) : (
             choicesState.map((choice) => {
               const isActive = activeChoiceId === choice.id;
@@ -3641,8 +3651,13 @@ export default function PropertiesPanel({
                 ? "On"
                 : "Off";
               return (
-                <div key={choice.id} className={styles.choiceItem}>
-                  <div className={styles.choiceItemHeader}>
+                <div
+                  key={choice.id}
+                  className={`${styles.choiceListItem} ${
+                    isActive ? styles.choiceListItemActive : ""
+                  }`}
+                >
+                  <div className={styles.choiceListContent}>
                     <ValueInput
                       value={choice.label}
                       onChange={(value) =>
@@ -3654,146 +3669,134 @@ export default function PropertiesPanel({
                         setActiveChoiceId(null);
                       }}
                       placeholder="Enter choice label or {variable}"
-                      size="large"
+                      size="middle"
                       className={styles.choiceLabelInput}
                     />
-                    <div className={styles.choiceItemActions}>
-                      <Popover
-                        trigger="click"
-                        open={isActive}
-                        onOpenChange={(open) => {
-                          if (open) {
-                            setActiveChoiceId(choice.id);
-                            setDraftChoice({ ...choice });
-                          } else {
-                            closePopover();
-                          }
-                        }}
-                        placement="right"
-                        overlayClassName={styles.choicePopoverOverlay}
-                        content={
-                          <div className={styles.choicePopover}>
-                            <Typography.Text
-                              className={styles.choicePopoverTitle}
-                            >
-                              Choice settings
-                            </Typography.Text>
-                            <Form layout="vertical">
-                              <Form.Item label="Intent">
-                                <IntentPicker
-                                  value={effectiveChoice.intent || ""}
-                                  onChange={(nextIntent) => {
-                                    setDraftChoice((current) => {
-                                      if (!current || current.id !== choice.id)
-                                        return current;
-                                      return {
-                                        ...current,
-                                        intent: nextIntent,
-                                      };
-                                    });
-                                  }}
-                                  placeholder="Select or create intent"
-                                  allowCreate
-                                  allowClear
-                                  createMode="modal"
-                                  size="middle"
-                                />
-                              </Form.Item>
-                              <Form.Item label="Button label">
-                                <Input
-                                  value={effectiveChoice.buttonLabel || ""}
-                                  onChange={(event) => {
-                                    const nextValue = event.target.value;
-                                    setDraftChoice((current) => {
-                                      if (!current || current.id !== choice.id)
-                                        return current;
-                                      return {
-                                        ...current,
-                                        buttonLabel: nextValue,
-                                      };
-                                    });
-                                  }}
-                                  placeholder="Optional button label"
-                                />
-                              </Form.Item>
-                              <Form.Item label="Automatically reprompt">
-                                <Switch
-                                  checked={
-                                    !!effectiveChoice.automaticallyReprompt
-                                  }
-                                  onChange={(checked) => {
-                                    setDraftChoice((current) => {
-                                      if (!current || current.id !== choice.id)
-                                        return current;
-                                      return {
-                                        ...current,
-                                        automaticallyReprompt: checked,
-                                      };
-                                    });
-                                  }}
-                                />
-                              </Form.Item>
-                            </Form>
-                            <div className={styles.choicePopoverFooter}>
-                              <Button onClick={closePopover}>Cancel</Button>
-                              <Button type="primary" onClick={saveDraftChoice}>
-                                Save
-                              </Button>
-                            </div>
-                          </div>
-                        }
-                      >
-                        <Button
-                          type="link"
-                          size="small"
-                          className={styles.choiceConfigureButton}
-                        >
-                          Configure
-                        </Button>
-                      </Popover>
-                      <Button
-                        type="text"
-                        icon={<MinusOutlined />}
-                        onClick={() => removeChoice(choice.id)}
-                        className={styles.choiceRemoveButton}
-                      />
+                    <div className={styles.choiceSummary}>
+                      <div className={styles.choiceSummaryRow}>
+                        <span className={styles.choiceSummaryLabel}>Intent</span>
+                        <span className={styles.choiceSummaryValue}>
+                          {summaryIntent}
+                        </span>
+                      </div>
+                      <div className={styles.choiceSummaryRow}>
+                        <span className={styles.choiceSummaryLabel}>Button</span>
+                        <span className={styles.choiceSummaryValue}>
+                          {summaryButton}
+                        </span>
+                      </div>
+                      <div className={styles.choiceSummaryRow}>
+                        <span className={styles.choiceSummaryLabel}>
+                          Auto reprompt
+                        </span>
+                        <span className={styles.choiceSummaryValue}>
+                          {summaryReprompt}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <div className={styles.choiceSummary}>
-                    <div className={styles.choiceSummaryRow}>
-                      <span className={styles.choiceSummaryLabel}>Intent</span>
-                      <span className={styles.choiceSummaryValue}>
-                        {summaryIntent}
-                      </span>
-                    </div>
-                    <div className={styles.choiceSummaryRow}>
-                      <span className={styles.choiceSummaryLabel}>Button</span>
-                      <span className={styles.choiceSummaryValue}>
-                        {summaryButton}
-                      </span>
-                    </div>
-                    <div className={styles.choiceSummaryRow}>
-                      <span className={styles.choiceSummaryLabel}>
-                        Auto reprompt
-                      </span>
-                      <span className={styles.choiceSummaryValue}>
-                        {summaryReprompt}
-                      </span>
-                    </div>
+                  <div className={styles.choiceItemActions}>
+                    <Popover
+                      trigger="click"
+                      open={isActive}
+                      onOpenChange={(open) => {
+                        if (open) {
+                          setActiveChoiceId(choice.id);
+                          setDraftChoice({ ...choice });
+                        } else {
+                          closePopover();
+                        }
+                      }}
+                      placement="right"
+                      overlayClassName={styles.choicePopoverOverlay}
+                      content={
+                        <div className={styles.choicePopover}>
+                          <Typography.Text className={styles.choicePopoverTitle}>
+                            Choice settings
+                          </Typography.Text>
+                          <Form layout="vertical">
+                            <Form.Item label="Intent">
+                              <IntentPicker
+                                value={effectiveChoice.intent || ""}
+                                onChange={(nextIntent) => {
+                                  setDraftChoice((current) => {
+                                    if (!current || current.id !== choice.id)
+                                      return current;
+                                    return {
+                                      ...current,
+                                      intent: nextIntent,
+                                    };
+                                  });
+                                }}
+                                placeholder="Select or create intent"
+                                allowCreate
+                                allowClear
+                                createMode="modal"
+                                size="middle"
+                              />
+                            </Form.Item>
+                            <Form.Item label="Button label">
+                              <Input
+                                value={effectiveChoice.buttonLabel || ""}
+                                onChange={(event) => {
+                                  const nextValue = event.target.value;
+                                  setDraftChoice((current) => {
+                                    if (!current || current.id !== choice.id)
+                                      return current;
+                                    return {
+                                      ...current,
+                                      buttonLabel: nextValue,
+                                    };
+                                  });
+                                }}
+                                placeholder="Optional button label"
+                              />
+                            </Form.Item>
+                            <Form.Item label="Automatically reprompt">
+                              <Switch
+                                checked={!!effectiveChoice.automaticallyReprompt}
+                                onChange={(checked) => {
+                                  setDraftChoice((current) => {
+                                    if (!current || current.id !== choice.id)
+                                      return current;
+                                    return {
+                                      ...current,
+                                      automaticallyReprompt: checked,
+                                    };
+                                  });
+                                }}
+                              />
+                            </Form.Item>
+                          </Form>
+                          <div className={styles.choicePopoverFooter}>
+                            <Button onClick={closePopover}>Cancel</Button>
+                            <Button type="primary" onClick={saveDraftChoice}>
+                              Save
+                            </Button>
+                          </div>
+                        </div>
+                      }
+                    >
+                      <Button
+                        type="link"
+                        size="small"
+                        className={styles.choiceConfigureButton}
+                      >
+                        Configure
+                      </Button>
+                    </Popover>
+                    <Button
+                      type="text"
+                      icon={<MinusOutlined />}
+                      onClick={() => removeChoice(choice.id)}
+                      className={styles.choiceRemoveButton}
+                    />
                   </div>
                 </div>
               );
             })
           )}
         </div>
-        <Button
-          type="dashed"
-          icon={<PlusOutlined />}
-          onClick={addChoice}
-          className={styles.choiceAddButton}
-        >
-          Add choice
-        </Button>
       </div>
     );
   };

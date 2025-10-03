@@ -1285,48 +1285,100 @@
   gap: 12px;
 }
 
+.choiceHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .choiceList {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
-.choiceEmpty {
+.choiceListItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.choiceListItemActive {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.12);
+  background: #f0f6ff;
+}
+
+.choiceListItemEmpty {
+  justify-content: space-between;
+  align-items: center;
   color: #94a3b8;
+  font-style: italic;
+}
+
+.choiceEmptyLabel {
   font-size: 13px;
 }
 
-.choiceItem {
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 16px;
-  background: #ffffff;
+.choiceListContent {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
-}
-
-.choiceItemHeader {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  gap: 8px;
+  min-width: 0;
 }
 
 .choiceLabelInput {
   flex: 1;
+
+  :global(.ant-input) {
+    border: none;
+    box-shadow: none !important;
+    background: transparent;
+    padding: 0;
+    height: auto;
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  :global(.ant-input:focus),
+  :global(.ant-input-focused) {
+    box-shadow: none;
+    background: transparent;
+  }
+
+  :global(.ant-input::placeholder) {
+    color: #cbd5f5;
+  }
 }
 
 .choiceItemActions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
+  align-self: flex-start;
 }
 
 .choiceConfigureButton {
   padding: 0;
   height: auto;
   font-weight: 500;
+  color: #475569;
+
+  &:hover {
+    color: #1f2937;
+    background: transparent;
+  }
 }
 
 .choiceRemoveButton {
@@ -1343,48 +1395,47 @@
 
   &:hover {
     color: #ef4444;
+    background: transparent;
   }
 }
 
 .choiceSummary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #f1f5f9;
 }
 
 .choiceSummaryRow {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 4px;
 }
 
 .choiceSummaryLabel {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  color: #64748b;
+  color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .choiceSummaryValue {
-  font-size: 13px;
+  font-size: 12px;
   color: #0f172a;
   font-weight: 500;
 }
 
 .choiceAddButton {
-  align-self: flex-start;
+  color: #475569;
+  padding: 0;
+
+  &:hover {
+    color: #0f172a;
+    background: transparent;
+  }
 
   &:global(.ant-btn) {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 0 12px;
-    height: 36px;
-    border-radius: 12px;
-    border-style: dashed;
+    height: auto;
   }
 }
 
