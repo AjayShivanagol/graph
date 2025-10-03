@@ -3632,6 +3632,14 @@ export default function PropertiesPanel({
               const isActive = activeChoiceId === choice.id;
               const effectiveChoice =
                 isActive && draftChoice ? draftChoice : choice;
+              const summaryIntent =
+                (effectiveChoice.intent || "").trim() || "None";
+              const summaryButton =
+                (effectiveChoice.buttonLabel || "").trim() ||
+                "Not configured";
+              const summaryReprompt = effectiveChoice.automaticallyReprompt
+                ? "On"
+                : "Off";
               return (
                 <div key={choice.id} className={styles.choiceItem}>
                   <div className={styles.choiceItemHeader}>
@@ -3755,13 +3763,13 @@ export default function PropertiesPanel({
                     <div className={styles.choiceSummaryRow}>
                       <span className={styles.choiceSummaryLabel}>Intent</span>
                       <span className={styles.choiceSummaryValue}>
-                        {choice.intent || "None"}
+                        {summaryIntent}
                       </span>
                     </div>
                     <div className={styles.choiceSummaryRow}>
                       <span className={styles.choiceSummaryLabel}>Button</span>
                       <span className={styles.choiceSummaryValue}>
-                        {choice.buttonLabel || "Not configured"}
+                        {summaryButton}
                       </span>
                     </div>
                     <div className={styles.choiceSummaryRow}>
@@ -3769,7 +3777,7 @@ export default function PropertiesPanel({
                         Auto reprompt
                       </span>
                       <span className={styles.choiceSummaryValue}>
-                        {choice.automaticallyReprompt ? "On" : "Off"}
+                        {summaryReprompt}
                       </span>
                     </div>
                   </div>

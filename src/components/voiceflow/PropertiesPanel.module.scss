@@ -1299,7 +1299,7 @@
 .choiceItem {
   border: 1px solid #e2e8f0;
   border-radius: 16px;
-  padding: 12px;
+  padding: 16px;
   background: #ffffff;
   display: flex;
   flex-direction: column;
@@ -1309,7 +1309,7 @@
 
 .choiceItemHeader {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
 }
 
@@ -1319,18 +1319,27 @@
 
 .choiceItemActions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
   gap: 8px;
 }
 
 .choiceConfigureButton {
   padding: 0;
   height: auto;
+  font-weight: 500;
 }
 
 .choiceRemoveButton {
   color: #94a3b8;
+
+  &:global(.ant-btn-text) {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+  }
 
   &:hover {
     color: #ef4444;
@@ -1341,6 +1350,8 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
 }
 
 .choiceSummaryRow {
@@ -1354,15 +1365,27 @@
   font-weight: 600;
   color: #64748b;
   text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .choiceSummaryValue {
   font-size: 13px;
-  color: #1f2937;
+  color: #0f172a;
+  font-weight: 500;
 }
 
 .choiceAddButton {
   align-self: flex-start;
+
+  &:global(.ant-btn) {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 12px;
+    height: 36px;
+    border-radius: 12px;
+    border-style: dashed;
+  }
 }
 
 .choicePopoverOverlay {
