@@ -168,12 +168,18 @@ const normalizeChoiceOptions = (choices: any[]): ChoiceOption[] => {
     const rawLabel = typeof ensured.label === "string" ? ensured.label : "";
     const trimmedLabel = rawLabel.trim();
     const rawIntent = typeof ensured.intent === "string" ? ensured.intent : "";
+    const trimmedIntent = rawIntent.trim();
     const rawButtonLabel =
       typeof ensured.buttonLabel === "string" ? ensured.buttonLabel : "";
     return {
       id: ensured.id,
-      label: trimmedLabel.length > 0 ? trimmedLabel : "",
-      intent: rawIntent.trim() || undefined,
+      label:
+        trimmedLabel.length > 0
+          ? trimmedLabel
+          : trimmedIntent.length > 0
+          ? trimmedIntent
+          : "",
+      intent: trimmedIntent || undefined,
       buttonLabel: rawButtonLabel.trim() || undefined,
     };
   });
@@ -4173,13 +4179,12 @@ export default function PropertiesPanel({
 
     const saveDraftChoice = () => {
       if (!draftChoice) return;
-      const trimmedLabel = (draftChoice.label || "").trim();
       const trimmedIntent = (draftChoice.intent || "").trim();
       const trimmedButton = (draftChoice.buttonLabel || "").trim();
       updateChoice(
         draftChoice.id,
         {
-          label: trimmedLabel,
+          label: trimmedIntent.length > 0 ? trimmedIntent : "",
           intent: trimmedIntent || undefined,
           buttonLabel: trimmedButton.length > 0 ? trimmedButton : undefined,
         },
@@ -4216,13 +4221,13 @@ export default function PropertiesPanel({
               const summaryIntent = (effectiveChoice.intent || "").trim();
               const summaryLabel = (effectiveChoice.label || "").trim();
               const summaryDisplay =
-                summaryLabel.length > 0
-                  ? summaryLabel
-                  : summaryIntent.length > 0
+                summaryIntent.length > 0
                   ? summaryIntent
-                  : "Intent";
+                  : summaryLabel.length > 0
+                  ? summaryLabel
+                  : "Select intent";
               const isPlaceholder =
-                summaryLabel.length === 0 && summaryIntent.length === 0;
+                summaryIntent.length === 0 && summaryLabel.length === 0;
               return (
                 <div
                   key={choice.id}
@@ -4249,23 +4254,6 @@ export default function PropertiesPanel({
                           Choice settings
                         </Typography.Text>
                         <Form layout="vertical">
-                          <Form.Item label="Label">
-                            <Input
-                              value={effectiveChoice.label || ""}
-                              onChange={(event) => {
-                                const nextValue = event.target.value;
-                                setDraftChoice((current) => {
-                                  if (!current || current.id !== choice.id)
-                                    return current;
-                                  return {
-                                    ...current,
-                                    label: nextValue,
-                                  };
-                                });
-                              }}
-                              placeholder="Optional label"
-                            />
-                          </Form.Item>
                           <Form.Item label="Intent">
                             <IntentPicker
                               value={effectiveChoice.intent || ""}
@@ -4276,6 +4264,10 @@ export default function PropertiesPanel({
                                   return {
                                     ...current,
                                     intent: nextIntent,
+                                    label:
+                                      typeof nextIntent === "string"
+                                        ? nextIntent.trim()
+                                        : "",
                                   };
                                 });
                               }}
