@@ -1425,6 +1425,10 @@
   font-weight: 500;
 }
 
+.choiceDivider {
+  margin: 4px 0 0;
+}
+
 .choiceAddButton {
   color: #475569;
   padding: 0;
@@ -1581,6 +1585,12 @@
 
 .buttonsNodeDivider {
   margin: 8px 0 0;
+}
+
+.fallbackSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .buttonsFallbackList {

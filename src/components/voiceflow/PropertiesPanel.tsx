@@ -111,6 +111,12 @@ interface ChoiceOption {
   automaticallyReprompt?: boolean;
 }
 
+interface FallbackSettingsProps {
+  selectedNode: any;
+  selectedNodeId: string;
+  handleUpdateNodeBatch: (fields: Record<string, any>) => void;
+}
+
 const generateChoiceId = () =>
   `choice-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}`;
 
@@ -306,6 +312,591 @@ const fallbackConfigsEqual = (
   }
 
   return true;
+};
+
+const FallbackSettings: React.FC<FallbackSettingsProps> = ({
+  selectedNode,
+  selectedNodeId,
+  handleUpdateNodeBatch,
+}) => {
+  const rawNoMatch = selectedNode.data?.noMatch as
+    | ButtonsFallbackConfig
+    | undefined;
+  const rawNoReply = selectedNode.data?.noReply as
+    | ButtonsFallbackConfig
+    | undefined;
+  const listenForOtherTriggers = !!selectedNode.data?.listenForOtherTriggers;
+
+  const [noMatchConfig, setNoMatchConfig] = useState<ButtonsFallbackConfig>(
+    ensureFallbackReprompts(normalizeFallbackConfig(rawNoMatch))
+  );
+  const [noReplyConfig, setNoReplyConfig] = useState<ButtonsFallbackConfig>(
+    ensureFallbackReprompts(
+      normalizeFallbackConfig(rawNoReply, { inactivityTimeout: 10 })
+    )
+  );
+  const [fallbackPopover, setFallbackPopover] = useState<
+    "noMatch" | "noReply" | null
+  >(null);
+  const [draftNoMatch, setDraftNoMatch] = useState<ButtonsFallbackConfig>(
+    ensureFallbackReprompts(normalizeFallbackConfig(rawNoMatch))
+  );
+  const [draftNoReply, setDraftNoReply] = useState<ButtonsFallbackConfig>(
+    ensureFallbackReprompts(
+      normalizeFallbackConfig(rawNoReply, { inactivityTimeout: 10 })
+    )
+  );
+  const repromptRefs = useRef<Record<number, RichTextEditorHandle | null>>({});
+  const [editingRepromptIndex, setEditingRepromptIndex] = useState<
+    number | null
+  >(null);
+  const [pathLabelPopover, setPathLabelPopover] = useState<
+    "noMatch" | "noReply" | null
+  >(null);
+
+  useEffect(() => {
+    setNoMatchConfig(
+      ensureFallbackReprompts(normalizeFallbackConfig(rawNoMatch))
+    );
+  }, [rawNoMatch, selectedNodeId]);
+
+  useEffect(() => {
+    setNoReplyConfig(
+      ensureFallbackReprompts(
+        normalizeFallbackConfig(rawNoReply, { inactivityTimeout: 10 })
+      )
+    );
+  }, [rawNoReply, selectedNodeId]);
+
+  useEffect(() => {
+    if (fallbackPopover !== "noMatch") {
+      setDraftNoMatch(ensureFallbackReprompts(noMatchConfig));
+    }
+  }, [noMatchConfig, fallbackPopover]);
+
+  useEffect(() => {
+    if (fallbackPopover !== "noReply") {
+      setDraftNoReply(ensureFallbackReprompts(noReplyConfig));
+    }
+  }, [noReplyConfig, fallbackPopover]);
+
+  useEffect(() => {
+    if (editingRepromptIndex === null) return;
+    const focusLater = () => {
+      const ref = repromptRefs.current[editingRepromptIndex];
+      ref?.focus?.();
+    };
+    const id = window.setTimeout(focusLater, 0);
+    return () => window.clearTimeout(id);
+  }, [editingRepromptIndex, fallbackPopover]);
+
+  useEffect(() => {
+    setFallbackPopover(null);
+  }, [selectedNodeId]);
+
+  useEffect(() => {
+    if (!fallbackPopover) {
+      setPathLabelPopover(null);
+    }
+  }, [fallbackPopover]);
+
+  const commitNoMatch = (next: ButtonsFallbackConfig) => {
+    setNoMatchConfig(next);
+    handleUpdateNodeBatch({ noMatch: next });
+  };
+
+  const commitNoReply = (next: ButtonsFallbackConfig) => {
+    setNoReplyConfig(next);
+    handleUpdateNodeBatch({ noReply: next });
+  };
+
+  const toggleNoMatch = (enabled: boolean) => {
+    const nextConfig: ButtonsFallbackConfig = {
+      ...noMatchConfig,
+      enabled,
+      reprompts:
+        enabled && noMatchConfig.reprompts.length === 0
+          ? [""]
+          : noMatchConfig.reprompts,
+    };
+    commitNoMatch(nextConfig);
+    setFallbackPopover((prev) =>
+      enabled ? "noMatch" : prev === "noMatch" ? null : prev
+    );
+    setDraftNoMatch(ensureFallbackReprompts(nextConfig));
+  };
+
+  const toggleNoReply = (enabled: boolean) => {
+    const nextConfig: ButtonsFallbackConfig = {
+      ...noReplyConfig,
+      enabled,
+      reprompts:
+        enabled && noReplyConfig.reprompts.length === 0
+          ? [""]
+          : noReplyConfig.reprompts,
+      inactivityTimeout:
+        typeof noReplyConfig.inactivityTimeout === "number"
+          ? noReplyConfig.inactivityTimeout
+          : 10,
+    };
+    commitNoReply(nextConfig);
+    setFallbackPopover((prev) =>
+      enabled ? "noReply" : prev === "noReply" ? null : prev
+    );
+    setDraftNoReply(ensureFallbackReprompts(nextConfig));
+  };
+
+  const renderRepromptEditor = (
+    draft: ButtonsFallbackConfig,
+    setDraft: React.Dispatch<React.SetStateAction<ButtonsFallbackConfig>>,
+    options: {
+      showInactivity?: boolean;
+      followPathLabel?: string;
+      context: "noMatch" | "noReply";
+    }
+  ) => {
+    const safeDraft = ensureFallbackReprompts(draft);
+
+    const updateDraft = (
+      updater: (current: ButtonsFallbackConfig) => ButtonsFallbackConfig
+    ) => {
+      setDraft((current) => {
+        const ensuredCurrent = ensureFallbackReprompts(current);
+        const next = ensureFallbackReprompts(updater(ensuredCurrent));
+        return next;
+      });
+    };
+
+    const handleAddReprompt = () => {
+      updateDraft((current) => ({
+        ...current,
+        reprompts: [...current.reprompts, ""],
+      }));
+    };
+
+    const handleGenerateReprompts = (count: number) => {
+      if (!Number.isFinite(count) || count <= 0) return;
+      updateDraft((current) => {
+        const ensuredCurrent = ensureFallbackReprompts(current);
+        let nextReprompts = ensuredCurrent.reprompts.slice(0, count);
+        if (nextReprompts.length < count) {
+          nextReprompts = [
+            ...nextReprompts,
+            ...Array(count - nextReprompts.length).fill(""),
+          ];
+        }
+        return {
+          ...ensuredCurrent,
+          reprompts: nextReprompts,
+        };
+      });
+      setEditingRepromptIndex(count - 1);
+    };
+
+    const handleRemoveReprompt = (index: number) => {
+      updateDraft((current) => {
+        const nextPrompts = current.reprompts.filter(
+          (_, idx) => idx !== index
+        );
+        return {
+          ...current,
+          reprompts: nextPrompts.length ? nextPrompts : [""],
+        };
+      });
+      setEditingRepromptIndex((current) => {
+        if (current === null) return current;
+        if (current === index) return null;
+        if (current > index) return current - 1;
+        return current;
+      });
+      delete repromptRefs.current[index];
+    };
+
+    return (
+      <div className={styles.buttonsFallbackCard}>
+        {options?.showInactivity && (
+          <div className={styles.buttonsFallbackFieldRow}>
+            <div className={styles.buttonsFallbackFieldLabel}>
+              Inactivity time (sec)
+            </div>
+            <InputNumber
+              min={1}
+              value={safeDraft.inactivityTimeout || 10}
+              onChange={(value) =>
+                updateDraft((current) => ({
+                  ...current,
+                  inactivityTimeout:
+                    typeof value === "number"
+                      ? value
+                      : current.inactivityTimeout,
+                }))
+              }
+            />
+          </div>
+        )}
+        <Typography.Text className={styles.buttonsFallbackCardTitle}>
+          Reprompts
+        </Typography.Text>
+        <div className={styles.buttonsRepromptList}>
+          {safeDraft.reprompts.map((reprompt, index) => {
+            const isEditing = editingRepromptIndex === index;
+
+            return (
+              <div key={index} className={styles.buttonsRepromptRow}>
+                <div className={styles.buttonsRepromptEditor}>
+                  {isEditing ? (
+                    <RichTextEditor
+                      ref={(instance) => {
+                        if (instance) {
+                          repromptRefs.current[index] = instance;
+                        } else {
+                          delete repromptRefs.current[index];
+                        }
+                      }}
+                      value={reprompt}
+                      onChange={(value) =>
+                        updateDraft((current) => {
+                          const nextPrompts = [...current.reprompts];
+                          nextPrompts[index] = value;
+                          return {
+                            ...current,
+                            reprompts: nextPrompts,
+                          };
+                        })
+                      }
+                      placeholder={`Enter reprompt ${index + 1}`}
+                      className={styles.buttonsRichEditor}
+                      onBlur={() => {
+                        window.setTimeout(() => {
+                          setEditingRepromptIndex((current) =>
+                            current === index ? null : current
+                          );
+                        }, 150);
+                      }}
+                    />
+                  ) : (
+                    <div
+                      className={styles.buttonsRepromptPreview}
+                      onClick={() => {
+                        setEditingRepromptIndex(index);
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setEditingRepromptIndex(index);
+                        }
+                      }}
+                      dangerouslySetInnerHTML={{
+                        __html: reprompt.trim().length
+                          ? renderFormattedReprompt(reprompt)
+                          : `<span class="placeholder">Enter reprompt ${
+                              index + 1
+                            }</span>`,
+                      }}
+                    />
+                  )}
+                </div>
+                <Button
+                  type="text"
+                  icon={<MinusOutlined />}
+                  className={styles.buttonsRepromptRemove}
+                  onClick={() => handleRemoveReprompt(index)}
+                  disabled={safeDraft.reprompts.length <= 1}
+                />
+              </div>
+            );
+          })}
+        </div>
+        <div className={styles.buttonsRepromptActions}>
+          <Dropdown
+            trigger={["click"]}
+            overlayClassName={styles.buttonsRepromptGenerateMenu}
+            menu={{
+              items: [
+                { key: "1", label: "Generate 1 variant" },
+                { key: "3", label: "Generate 3 variants" },
+                { key: "5", label: "Generate 5 variants" },
+              ],
+              onClick: ({ key }) => {
+                const parsed = Number.parseInt(key, 10);
+                handleGenerateReprompts(Number.isNaN(parsed) ? 0 : parsed);
+              },
+            }}
+          >
+            <Button className={styles.buttonsRepromptGenerate}>
+              <span className={styles.buttonsRepromptGenerateIcon}>✨</span>
+              Generate
+              <DownOutlined className={styles.buttonsRepromptGenerateCaret} />
+            </Button>
+          </Dropdown>
+          <Button
+            type="dashed"
+            icon={<PlusOutlined />}
+            onClick={handleAddReprompt}
+            className={styles.buttonsRepromptAdd}
+          >
+            Add reprompt
+          </Button>
+        </div>
+        <div className={styles.buttonsFollowPathRow}>
+          <span className={styles.buttonsFollowPathLabel}>
+            Follow path after reprompts?
+          </span>
+          <Switch
+            checked={!!safeDraft.followPath}
+            onChange={(checked) => {
+              updateDraft((current) => {
+                const ensuredCurrent = ensureFallbackReprompts(current);
+                return {
+                  ...ensuredCurrent,
+                  followPath: checked,
+                  pathLabel: checked
+                    ? ensuredCurrent.pathLabel?.trim()
+                      ? ensuredCurrent.pathLabel
+                      : options.followPathLabel || ""
+                    : ensuredCurrent.pathLabel,
+                };
+              });
+              setPathLabelPopover((current) => {
+                if (checked) {
+                  return options.context;
+                }
+                return current === options.context ? null : current;
+              });
+            }}
+          />
+        </div>
+        {safeDraft.followPath && (
+          <Popover
+            trigger={["click"]}
+            destroyTooltipOnHide
+            placement="left"
+            overlayClassName={styles.buttonsPathLabelPopover}
+            open={pathLabelPopover === options.context}
+            onOpenChange={(open) => {
+              setPathLabelPopover((current) => {
+                if (open) {
+                  return options.context;
+                }
+                return current === options.context ? null : current;
+              });
+            }}
+            content={
+              <div className={styles.buttonsPathLabelPopoverContent}>
+                <Typography.Text className={styles.buttonsPathLabelPopoverTitle}>
+                  Path label
+                </Typography.Text>
+                <Input
+                  autoFocus
+                  value={safeDraft.pathLabel || ""}
+                  onChange={(event) => {
+                    const { value } = event.target;
+                    updateDraft((current) => ({
+                      ...ensureFallbackReprompts(current),
+                      pathLabel: value,
+                    }));
+                  }}
+                  placeholder={
+                    options.followPathLabel ||
+                    `Enter ${
+                      options.context === "noMatch" ? "no match" : "no reply"
+                    } label`
+                  }
+                  className={styles.buttonsPathLabelInput}
+                  onPressEnter={() =>
+                    setPathLabelPopover((current) =>
+                      current === options.context ? null : current
+                    )
+                  }
+                />
+                <Button
+                  type="primary"
+                  className={styles.buttonsPathLabelDone}
+                  onClick={() =>
+                    setPathLabelPopover((current) =>
+                      current === options.context ? null : current
+                    )
+                  }
+                >
+                  Done
+                </Button>
+              </div>
+            }
+          >
+            <button
+              type="button"
+              className={styles.buttonsPathLabelTrigger}
+            >
+              <span className={styles.buttonsPathLabelTriggerTitle}>
+                Path label
+              </span>
+              <span className={styles.buttonsPathLabelTriggerValue}>
+                {safeDraft.pathLabel?.trim() ||
+                  options.followPathLabel ||
+                  `Enter ${
+                    options.context === "noMatch" ? "no match" : "no reply"
+                  } label`}
+              </span>
+            </button>
+          </Popover>
+        )}
+      </div>
+    );
+  };
+
+  const handleFallbackOpenChange =
+    (key: "noMatch" | "noReply") => (visible: boolean) => {
+      setFallbackPopover((prev) => {
+        if (visible) {
+          if (prev && prev !== key) {
+            commitDraftConfig(prev);
+          }
+          if (key === "noMatch") {
+            setDraftNoMatch(ensureFallbackReprompts(noMatchConfig));
+          } else {
+            setDraftNoReply(ensureFallbackReprompts(noReplyConfig));
+          }
+          setPathLabelPopover(null);
+          return key;
+        }
+        commitDraftConfig(key);
+        setPathLabelPopover((current) =>
+          current === key ? null : current
+        );
+        return prev === key ? null : prev;
+      });
+    };
+
+  const setListenForOtherTriggers = (checked: boolean) => {
+    handleUpdateNodeBatch({ listenForOtherTriggers: checked });
+  };
+
+  const commitDraftConfig = useCallback(
+    (key: "noMatch" | "noReply") => {
+      if (key === "noMatch") {
+        const ensured = ensureFallbackReprompts(draftNoMatch);
+        if (!fallbackConfigsEqual(ensured, noMatchConfig)) {
+          commitNoMatch(ensured);
+        }
+        setDraftNoMatch(ensured);
+      } else {
+        const ensured = ensureFallbackReprompts(draftNoReply);
+        if (!fallbackConfigsEqual(ensured, noReplyConfig)) {
+          commitNoReply(ensured);
+        }
+        setDraftNoReply(ensured);
+      }
+      setEditingRepromptIndex(null);
+    },
+    [
+      draftNoMatch,
+      draftNoReply,
+      noMatchConfig,
+      noReplyConfig,
+      commitNoMatch,
+      commitNoReply,
+    ]
+  );
+
+  return (
+    <div className={styles.fallbackSection}>
+      <Typography.Text className={styles.sectionHeading}>
+        Fallbacks
+      </Typography.Text>
+      <div className={styles.buttonsFallbackList}>
+        <Popover
+          trigger={["click"]}
+          destroyOnHidden
+          placement="left"
+          overlayClassName={styles.buttonsFallbackPopover}
+          open={fallbackPopover === "noMatch"}
+          onOpenChange={handleFallbackOpenChange("noMatch")}
+          content={renderRepromptEditor(draftNoMatch, setDraftNoMatch, {
+            context: "noMatch",
+            followPathLabel: "No match",
+          })}
+        >
+          <div
+            className={`${styles.buttonsFallbackItem} ${
+              fallbackPopover === "noMatch"
+                ? styles.buttonsFallbackItemActive
+                : ""
+            } ${
+              !noMatchConfig.enabled && fallbackPopover !== "noMatch"
+                ? styles.buttonsFallbackItemInactive
+                : ""
+            }`}
+          >
+            <span className={styles.buttonsFallbackItemLabel}>No match</span>
+            <span
+              className={styles.buttonsFallbackSwitch}
+              onClick={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <Switch checked={!!noMatchConfig.enabled} onChange={toggleNoMatch} />
+            </span>
+          </div>
+        </Popover>
+
+        <Popover
+          trigger={["click"]}
+          destroyOnHidden
+          placement="left"
+          overlayClassName={styles.buttonsFallbackPopover}
+          open={fallbackPopover === "noReply"}
+          onOpenChange={handleFallbackOpenChange("noReply")}
+          content={renderRepromptEditor(draftNoReply, setDraftNoReply, {
+            showInactivity: true,
+            context: "noReply",
+            followPathLabel: "No reply",
+          })}
+        >
+          <div
+            className={`${styles.buttonsFallbackItem} ${
+              fallbackPopover === "noReply"
+                ? styles.buttonsFallbackItemActive
+                : ""
+            } ${
+              !noReplyConfig.enabled && fallbackPopover !== "noReply"
+                ? styles.buttonsFallbackItemInactive
+                : ""
+            }`}
+          >
+            <span className={styles.buttonsFallbackItemLabel}>No reply</span>
+            <span
+              className={styles.buttonsFallbackSwitch}
+              onClick={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <Switch checked={!!noReplyConfig.enabled} onChange={toggleNoReply} />
+            </span>
+          </div>
+        </Popover>
+
+        <div
+          className={`${styles.buttonsFallbackItem} ${
+            !listenForOtherTriggers ? styles.buttonsFallbackItemInactive : ""
+          } ${styles.buttonsFallbackItemStatic}`}
+        >
+          <span className={styles.buttonsFallbackItemLabel}>
+            Listen for other triggers
+          </span>
+          <span
+            className={styles.buttonsFallbackSwitch}
+            onClick={(event) => event.stopPropagation()}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <Switch
+              checked={listenForOtherTriggers}
+              onChange={setListenForOtherTriggers}
+            />
+          </span>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 interface CarouselCard {
@@ -3797,6 +4388,12 @@ export default function PropertiesPanel({
             })
           )}
         </div>
+        <Divider className={styles.choiceDivider} />
+        <FallbackSettings
+          selectedNode={selectedNode}
+          selectedNodeId={selectedNodeId}
+          handleUpdateNodeBatch={handleUpdateNodeBatch}
+        />
       </div>
     );
   };
@@ -3991,485 +4588,6 @@ export default function PropertiesPanel({
       );
     };
 
-    const rawNoMatch = selectedNode.data.noMatch as
-      | ButtonsFallbackConfig
-      | undefined;
-    const rawNoReply = selectedNode.data.noReply as
-      | ButtonsFallbackConfig
-      | undefined;
-    const listenForOtherTriggers = !!selectedNode.data.listenForOtherTriggers;
-
-    const [noMatchConfig, setNoMatchConfig] = useState<ButtonsFallbackConfig>(
-      ensureFallbackReprompts(normalizeFallbackConfig(rawNoMatch))
-    );
-    const [noReplyConfig, setNoReplyConfig] = useState<ButtonsFallbackConfig>(
-      ensureFallbackReprompts(
-        normalizeFallbackConfig(rawNoReply, { inactivityTimeout: 10 })
-      )
-    );
-    const [fallbackPopover, setFallbackPopover] = useState<
-      "noMatch" | "noReply" | null
-    >(null);
-    const [draftNoMatch, setDraftNoMatch] = useState<ButtonsFallbackConfig>(
-      ensureFallbackReprompts(normalizeFallbackConfig(rawNoMatch))
-    );
-    const [draftNoReply, setDraftNoReply] = useState<ButtonsFallbackConfig>(
-      ensureFallbackReprompts(
-        normalizeFallbackConfig(rawNoReply, { inactivityTimeout: 10 })
-      )
-    );
-    const repromptRefs = useRef<Record<number, RichTextEditorHandle | null>>(
-      {}
-    );
-    const [editingRepromptIndex, setEditingRepromptIndex] = useState<
-      number | null
-    >(null);
-    const [pathLabelPopover, setPathLabelPopover] = useState<
-      "noMatch" | "noReply" | null
-    >(null);
-
-    useEffect(() => {
-      setNoMatchConfig(
-        ensureFallbackReprompts(normalizeFallbackConfig(rawNoMatch))
-      );
-    }, [rawNoMatch, selectedNodeId]);
-
-    useEffect(() => {
-      setNoReplyConfig(
-        ensureFallbackReprompts(
-          normalizeFallbackConfig(rawNoReply, { inactivityTimeout: 10 })
-        )
-      );
-    }, [rawNoReply, selectedNodeId]);
-
-    useEffect(() => {
-      if (fallbackPopover !== "noMatch") {
-        setDraftNoMatch(ensureFallbackReprompts(noMatchConfig));
-      }
-    }, [noMatchConfig, fallbackPopover]);
-
-    useEffect(() => {
-      if (fallbackPopover !== "noReply") {
-        setDraftNoReply(ensureFallbackReprompts(noReplyConfig));
-      }
-    }, [noReplyConfig, fallbackPopover]);
-
-    useEffect(() => {
-      if (editingRepromptIndex === null) return;
-      const focusLater = () => {
-        const ref = repromptRefs.current[editingRepromptIndex];
-        ref?.focus?.();
-      };
-      const id = window.setTimeout(focusLater, 0);
-      return () => window.clearTimeout(id);
-    }, [editingRepromptIndex, fallbackPopover]);
-
-    useEffect(() => {
-      setFallbackPopover(null);
-    }, [selectedNodeId]);
-
-    useEffect(() => {
-      if (!fallbackPopover) {
-        setPathLabelPopover(null);
-      }
-    }, [fallbackPopover]);
-
-    const commitNoMatch = (next: ButtonsFallbackConfig) => {
-      setNoMatchConfig(next);
-      handleUpdateNodeBatch({ noMatch: next });
-    };
-
-    const commitNoReply = (next: ButtonsFallbackConfig) => {
-      setNoReplyConfig(next);
-      handleUpdateNodeBatch({ noReply: next });
-    };
-
-    const toggleNoMatch = (enabled: boolean) => {
-      const nextConfig: ButtonsFallbackConfig = {
-        ...noMatchConfig,
-        enabled,
-        reprompts:
-          enabled && noMatchConfig.reprompts.length === 0
-            ? [""]
-            : noMatchConfig.reprompts,
-      };
-      commitNoMatch(nextConfig);
-      setFallbackPopover((prev) =>
-        enabled ? "noMatch" : prev === "noMatch" ? null : prev
-      );
-      setDraftNoMatch(ensureFallbackReprompts(nextConfig));
-    };
-
-    const toggleNoReply = (enabled: boolean) => {
-      const nextConfig: ButtonsFallbackConfig = {
-        ...noReplyConfig,
-        enabled,
-        reprompts:
-          enabled && noReplyConfig.reprompts.length === 0
-            ? [""]
-            : noReplyConfig.reprompts,
-        inactivityTimeout:
-          typeof noReplyConfig.inactivityTimeout === "number"
-            ? noReplyConfig.inactivityTimeout
-            : 10,
-      };
-      commitNoReply(nextConfig);
-      setFallbackPopover((prev) =>
-        enabled ? "noReply" : prev === "noReply" ? null : prev
-      );
-      setDraftNoReply(ensureFallbackReprompts(nextConfig));
-    };
-
-    const renderRepromptEditor = (
-      draft: ButtonsFallbackConfig,
-      setDraft: React.Dispatch<React.SetStateAction<ButtonsFallbackConfig>>,
-      options: {
-        showInactivity?: boolean;
-        followPathLabel?: string;
-        context: "noMatch" | "noReply";
-      }
-    ) => {
-      const safeDraft = ensureFallbackReprompts(draft);
-
-      const updateDraft = (
-        updater: (current: ButtonsFallbackConfig) => ButtonsFallbackConfig
-      ) => {
-        setDraft((current) => {
-          const ensuredCurrent = ensureFallbackReprompts(current);
-          const next = ensureFallbackReprompts(updater(ensuredCurrent));
-          return next;
-        });
-      };
-
-      const handleAddReprompt = () => {
-        updateDraft((current) => ({
-          ...current,
-          reprompts: [...current.reprompts, ""],
-        }));
-      };
-
-      const handleGenerateReprompts = (count: number) => {
-        if (!Number.isFinite(count) || count <= 0) return;
-        updateDraft((current) => {
-          const ensuredCurrent = ensureFallbackReprompts(current);
-          let nextReprompts = ensuredCurrent.reprompts.slice(0, count);
-          if (nextReprompts.length < count) {
-            nextReprompts = [
-              ...nextReprompts,
-              ...Array(count - nextReprompts.length).fill(""),
-            ];
-          }
-          return {
-            ...ensuredCurrent,
-            reprompts: nextReprompts,
-          };
-        });
-        setEditingRepromptIndex(count - 1);
-      };
-
-      const handleRemoveReprompt = (index: number) => {
-        updateDraft((current) => {
-          const nextPrompts = current.reprompts.filter(
-            (_, idx) => idx !== index
-          );
-          return {
-            ...current,
-            reprompts: nextPrompts.length ? nextPrompts : [""],
-          };
-        });
-        setEditingRepromptIndex((current) => {
-          if (current === null) return current;
-          if (current === index) return null;
-          if (current > index) return current - 1;
-          return current;
-        });
-        delete repromptRefs.current[index];
-      };
-
-      return (
-        <div className={styles.buttonsFallbackCard}>
-          {options?.showInactivity && (
-            <div className={styles.buttonsFallbackFieldRow}>
-              <div className={styles.buttonsFallbackFieldLabel}>
-                Inactivity time (sec)
-              </div>
-              <InputNumber
-                min={1}
-                value={safeDraft.inactivityTimeout || 10}
-                onChange={(value) =>
-                  updateDraft((current) => ({
-                    ...current,
-                    inactivityTimeout:
-                      typeof value === "number"
-                        ? value
-                        : current.inactivityTimeout,
-                  }))
-                }
-              />
-            </div>
-          )}
-          <Typography.Text className={styles.buttonsFallbackCardTitle}>
-            Reprompts
-          </Typography.Text>
-          <div className={styles.buttonsRepromptList}>
-            {safeDraft.reprompts.map((reprompt, index) => {
-              const isEditing = editingRepromptIndex === index;
-
-              return (
-                <div key={index} className={styles.buttonsRepromptRow}>
-                  <div className={styles.buttonsRepromptEditor}>
-                    {isEditing ? (
-                      <RichTextEditor
-                        ref={(instance) => {
-                          if (instance) {
-                            repromptRefs.current[index] = instance;
-                          } else {
-                            delete repromptRefs.current[index];
-                          }
-                        }}
-                        value={reprompt}
-                        onChange={(value) =>
-                          updateDraft((current) => {
-                            const nextPrompts = [...current.reprompts];
-                            nextPrompts[index] = value;
-                            return {
-                              ...current,
-                              reprompts: nextPrompts,
-                            };
-                          })
-                        }
-                        placeholder={`Enter reprompt ${index + 1}`}
-                        className={styles.buttonsRichEditor}
-                        onBlur={() => {
-                          window.setTimeout(() => {
-                            setEditingRepromptIndex((current) =>
-                              current === index ? null : current
-                            );
-                          }, 150);
-                        }}
-                      />
-                    ) : (
-                      <div
-                        className={styles.buttonsRepromptPreview}
-                        onClick={() => {
-                          setEditingRepromptIndex(index);
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            setEditingRepromptIndex(index);
-                          }
-                        }}
-                        dangerouslySetInnerHTML={{
-                          __html: reprompt.trim().length
-                            ? renderFormattedReprompt(reprompt)
-                            : `<span class="placeholder">Enter reprompt ${
-                                index + 1
-                              }</span>`,
-                        }}
-                      />
-                    )}
-                  </div>
-                  <Button
-                    type="text"
-                    icon={<MinusOutlined />}
-                    className={styles.buttonsRepromptRemove}
-                    onClick={() => handleRemoveReprompt(index)}
-                    disabled={safeDraft.reprompts.length <= 1}
-                  />
-                </div>
-              );
-            })}
-          </div>
-          <div className={styles.buttonsRepromptActions}>
-            <Dropdown
-              trigger={["click"]}
-              overlayClassName={styles.buttonsRepromptGenerateMenu}
-              menu={{
-                items: [
-                  { key: "1", label: "Generate 1 variant" },
-                  { key: "3", label: "Generate 3 variants" },
-                  { key: "5", label: "Generate 5 variants" },
-                ],
-                onClick: ({ key }) => {
-                  const parsed = Number.parseInt(key, 10);
-                  handleGenerateReprompts(Number.isNaN(parsed) ? 0 : parsed);
-                },
-              }}
-            >
-              <Button className={styles.buttonsRepromptGenerate}>
-                <span className={styles.buttonsRepromptGenerateIcon}>✨</span>
-                Generate
-                <DownOutlined className={styles.buttonsRepromptGenerateCaret} />
-              </Button>
-            </Dropdown>
-            <Button
-              type="dashed"
-              icon={<PlusOutlined />}
-              onClick={handleAddReprompt}
-              className={styles.buttonsRepromptAdd}
-            >
-              Add reprompt
-            </Button>
-          </div>
-          <div className={styles.buttonsFollowPathRow}>
-            <span className={styles.buttonsFollowPathLabel}>
-              Follow path after reprompts?
-            </span>
-            <Switch
-              checked={!!safeDraft.followPath}
-              onChange={(checked) => {
-                updateDraft((current) => {
-                  const ensuredCurrent = ensureFallbackReprompts(current);
-                  return {
-                    ...ensuredCurrent,
-                    followPath: checked,
-                    pathLabel: checked
-                      ? ensuredCurrent.pathLabel?.trim()
-                        ? ensuredCurrent.pathLabel
-                        : options.followPathLabel || ""
-                      : ensuredCurrent.pathLabel,
-                  };
-                });
-                setPathLabelPopover((current) => {
-                  if (checked) {
-                    return options.context;
-                  }
-                  return current === options.context ? null : current;
-                });
-              }}
-            />
-          </div>
-          {safeDraft.followPath && (
-            <Popover
-              trigger={["click"]}
-              destroyTooltipOnHide
-              placement="left"
-              overlayClassName={styles.buttonsPathLabelPopover}
-              open={pathLabelPopover === options.context}
-              onOpenChange={(open) => {
-                setPathLabelPopover((current) => {
-                  if (open) {
-                    return options.context;
-                  }
-                  return current === options.context ? null : current;
-                });
-              }}
-              content={
-                <div className={styles.buttonsPathLabelPopoverContent}>
-                  <Typography.Text className={styles.buttonsPathLabelPopoverTitle}>
-                    Path label
-                  </Typography.Text>
-                  <Input
-                    autoFocus
-                    value={safeDraft.pathLabel || ""}
-                    onChange={(event) => {
-                      const { value } = event.target;
-                      updateDraft((current) => ({
-                        ...ensureFallbackReprompts(current),
-                        pathLabel: value,
-                      }));
-                    }}
-                    placeholder={
-                      options.followPathLabel ||
-                      `Enter ${options.context === "noMatch" ? "no match" : "no reply"} label`
-                    }
-                    className={styles.buttonsPathLabelInput}
-                    onPressEnter={() =>
-                      setPathLabelPopover((current) =>
-                        current === options.context ? null : current
-                      )
-                    }
-                  />
-                  <Button
-                    type="primary"
-                    className={styles.buttonsPathLabelDone}
-                    onClick={() =>
-                      setPathLabelPopover((current) =>
-                        current === options.context ? null : current
-                      )
-                    }
-                  >
-                    Done
-                  </Button>
-                </div>
-              }
-            >
-              <button
-                type="button"
-                className={styles.buttonsPathLabelTrigger}
-              >
-                <span className={styles.buttonsPathLabelTriggerTitle}>
-                  Path label
-                </span>
-                <span className={styles.buttonsPathLabelTriggerValue}>
-                  {safeDraft.pathLabel?.trim() ||
-                    options.followPathLabel ||
-                    `Enter ${options.context === "noMatch" ? "no match" : "no reply"} label`}
-                </span>
-              </button>
-            </Popover>
-          )}
-        </div>
-      );
-    };
-
-    const handleFallbackOpenChange =
-      (key: "noMatch" | "noReply") => (visible: boolean) => {
-        setFallbackPopover((prev) => {
-          if (visible) {
-            if (prev && prev !== key) {
-              commitDraftConfig(prev);
-            }
-            if (key === "noMatch") {
-              setDraftNoMatch(ensureFallbackReprompts(noMatchConfig));
-            } else {
-              setDraftNoReply(ensureFallbackReprompts(noReplyConfig));
-            }
-            setPathLabelPopover(null);
-            return key;
-          }
-          commitDraftConfig(key);
-          setPathLabelPopover((current) =>
-            current === key ? null : current
-          );
-          return prev === key ? null : prev;
-        });
-      };
-
-    const setListenForOtherTriggers = (checked: boolean) => {
-      handleUpdateNodeBatch({ listenForOtherTriggers: checked });
-    };
-
-    const commitDraftConfig = useCallback(
-      (key: "noMatch" | "noReply") => {
-        if (key === "noMatch") {
-          const ensured = ensureFallbackReprompts(draftNoMatch);
-          if (!fallbackConfigsEqual(ensured, noMatchConfig)) {
-            commitNoMatch(ensured);
-          }
-          setDraftNoMatch(ensured);
-        } else {
-          const ensured = ensureFallbackReprompts(draftNoReply);
-          if (!fallbackConfigsEqual(ensured, noReplyConfig)) {
-            commitNoReply(ensured);
-          }
-          setDraftNoReply(ensured);
-        }
-        setEditingRepromptIndex(null);
-      },
-      [
-        draftNoMatch,
-        draftNoReply,
-        noMatchConfig,
-        noReplyConfig,
-        commitNoMatch,
-        commitNoReply,
-      ]
-    );
-
     return (
       <div className={styles.buttonsNodeProperties}>
         <div className={styles.buttonsNodeHeaderRow}>
@@ -4533,105 +4651,11 @@ export default function PropertiesPanel({
 
         <Divider className={styles.buttonsNodeDivider} />
 
-        <Typography.Text className={styles.sectionHeading}>
-          Fallbacks
-        </Typography.Text>
-        <div className={styles.buttonsFallbackList}>
-          <Popover
-            trigger={["click"]}
-            destroyOnHidden
-            placement="left"
-            overlayClassName={styles.buttonsFallbackPopover}
-            open={fallbackPopover === "noMatch"}
-            onOpenChange={handleFallbackOpenChange("noMatch")}
-            content={renderRepromptEditor(draftNoMatch, setDraftNoMatch, {
-              context: "noMatch",
-              followPathLabel: "No match",
-            })}
-          >
-            <div
-              className={`${styles.buttonsFallbackItem} ${
-                fallbackPopover === "noMatch"
-                  ? styles.buttonsFallbackItemActive
-                  : ""
-              } ${
-                !noMatchConfig.enabled && fallbackPopover !== "noMatch"
-                  ? styles.buttonsFallbackItemInactive
-                  : ""
-              }`}
-            >
-              <span className={styles.buttonsFallbackItemLabel}>No match</span>
-              <span
-                className={styles.buttonsFallbackSwitch}
-                onClick={(event) => event.stopPropagation()}
-                onMouseDown={(event) => event.stopPropagation()}
-              >
-                <Switch
-                  checked={!!noMatchConfig.enabled}
-                  onChange={toggleNoMatch}
-                />
-              </span>
-            </div>
-          </Popover>
-
-          <Popover
-            trigger={["click"]}
-            destroyOnHidden
-            placement="left"
-            overlayClassName={styles.buttonsFallbackPopover}
-            open={fallbackPopover === "noReply"}
-            onOpenChange={handleFallbackOpenChange("noReply")}
-            content={renderRepromptEditor(draftNoReply, setDraftNoReply, {
-              showInactivity: true,
-              context: "noReply",
-              followPathLabel: "No reply",
-            })}
-          >
-            <div
-              className={`${styles.buttonsFallbackItem} ${
-                fallbackPopover === "noReply"
-                  ? styles.buttonsFallbackItemActive
-                  : ""
-              } ${
-                !noReplyConfig.enabled && fallbackPopover !== "noReply"
-                  ? styles.buttonsFallbackItemInactive
-                  : ""
-              }`}
-            >
-              <span className={styles.buttonsFallbackItemLabel}>No reply</span>
-              <span
-                className={styles.buttonsFallbackSwitch}
-                onClick={(event) => event.stopPropagation()}
-                onMouseDown={(event) => event.stopPropagation()}
-              >
-                <Switch
-                  checked={!!noReplyConfig.enabled}
-                  onChange={toggleNoReply}
-                />
-              </span>
-            </div>
-          </Popover>
-
-          <div
-            className={`${styles.buttonsFallbackItem} ${
-              !listenForOtherTriggers ? styles.buttonsFallbackItemInactive : ""
-            } ${styles.buttonsFallbackItemStatic}`}
-          >
-            <span className={styles.buttonsFallbackItemLabel}>
-              Listen for other triggers
-            </span>
-            <span
-              className={styles.buttonsFallbackSwitch}
-              onClick={(event) => event.stopPropagation()}
-              onMouseDown={(event) => event.stopPropagation()}
-            >
-              <Switch
-                checked={listenForOtherTriggers}
-                onChange={setListenForOtherTriggers}
-              />
-            </span>
-          </div>
-        </div>
+        <FallbackSettings
+          selectedNode={selectedNode}
+          selectedNodeId={selectedNodeId}
+          handleUpdateNodeBatch={handleUpdateNodeBatch}
+        />
       </div>
     );
   };
