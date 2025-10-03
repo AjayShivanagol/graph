@@ -8,13 +8,19 @@ import {
   Modal,
   Input,
   Form,
+  Tag,
+  Popover,
+  Empty,
 } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import {
-  addIntent,
-  addIntentDetailed,
-} from "../../store/slices/intentsSlice";
+  MinusCircleOutlined,
+  PlusOutlined,
+  ThunderboltOutlined,
+  InboxOutlined,
+} from "@ant-design/icons";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { addIntent, addIntentDetailed } from "../../store/slices/intentsSlice";
+import { addEntityDetailed } from "../../store/slices/entitiesSlice";
 
 export interface IntentPickerProps {
   value?: string;
@@ -30,12 +36,28 @@ export interface IntentPickerProps {
   onOpenChange?: (open: boolean) => void;
   searchValue?: string;
   createLabelFormat?: (search: string) => string;
+  selectOnCreate?: boolean;
 }
 
-const normalizeUtterances = (value?: string) => {
-  if (!value) return [];
-  return value
-    .split(",")
+const normalizeUtterances = (input: unknown): string[] => {
+  if (Array.isArray(input)) {
+    return input
+      .map((item) => (typeof item === "string" ? item : ""))
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
+  }
+  if (typeof input === "string") {
+    return input
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+  }
+  return [];
+};
+
+const normalizeEntities = (entities?: string[]): string[] => {
+  if (!Array.isArray(entities)) return [];
+  return entities
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
 };
@@ -46,7 +68,7 @@ export default function IntentPicker({
   placeholder,
   style,
   allowCreate = true,
-  allowClear = false,
+  allowClear = true,
   size = "middle",
   createMode = "inline",
   open,
@@ -54,35 +76,65 @@ export default function IntentPicker({
   searchValue,
   createLabelFormat,
   bordered = true,
+  selectOnCreate = false,
 }: IntentPickerProps) {
   const intents = useAppSelector((s) => s.intents?.list || []);
+  const entities = useAppSelector((s) => s.entities?.list || []);
   const dispatch = useAppDispatch();
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [entityModalOpen, setEntityModalOpen] = useState(false);
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [entitySearch, setEntitySearch] = useState("");
+  const [pendingEntityName, setPendingEntityName] = useState("");
+  const [entityValues, setEntityValues] = useState<string[]>([""]);
+  const [bulkImportText, setBulkImportText] = useState("");
+  const [selectedEntities, setSelectedEntities] = useState<string[]>([]);
+  const [entityPopoverOpen, setEntityPopoverOpen] = useState(false);
   const [form] = Form.useForm();
+  const [entityForm] = Form.useForm();
 
   const options = useMemo(
     () => intents.map((intent) => ({ label: intent, value: intent })),
     [intents]
   );
+  const entityOptions = useMemo(
+    () => entities.map((entity) => ({ label: entity, value: entity })),
+    [entities]
+  );
   const effectiveSearch = (searchValue ?? search).trim();
   const filteredOptions = useMemo(() => {
     if (!effectiveSearch) return options;
     const q = effectiveSearch.toLowerCase();
-    return options.filter((opt) =>
-      String(opt.label).toLowerCase().includes(q)
-    );
+    return options.filter((opt) => String(opt.label).toLowerCase().includes(q));
   }, [options, effectiveSearch]);
 
   const handleCreate = (name: string) => {
     const next = (name || "").trim();
     if (!next) return;
     dispatch(addIntent(next));
-    onChange?.(next);
+    if (selectOnCreate) {
+      onChange?.(next);
+    }
   };
 
   const openModal = () => {
     setModalOpen(true);
+  };
+
+  const appendEntityToIntent = (entityName: string) => {
+    const trimmed = (entityName || "").trim();
+    if (!trimmed) return;
+    setSelectedEntities((current) => {
+      if (current.includes(trimmed)) return current;
+      return [...current, trimmed];
+    });
+  };
+
+  const resetEntityModalState = () => {
+    setBulkImportText("");
+    setEntityValues([""]);
+    entityForm.resetFields();
   };
 
   const submitModal = async () => {
@@ -91,19 +143,106 @@ export default function IntentPicker({
       const name = (values.name || "").trim();
       if (!name) return;
       const utterances = normalizeUtterances(values.utterances);
+      const requiredEntities = normalizeEntities(selectedEntities);
       dispatch(
         addIntentDetailed({
           name,
           description: values.description?.trim() || undefined,
           utterances: utterances.length ? utterances : undefined,
+          requiredEntities: requiredEntities.length ? requiredEntities : undefined,
         })
       );
-      onChange?.(name);
+      if (selectOnCreate) {
+        onChange?.(name);
+      }
       setModalOpen(false);
     } catch (error) {
       // ignore validation errors
     }
   };
+
+  const handleEntityValueChange = (index: number, next: string) => {
+    setEntityValues((current) => {
+      const updated = [...current];
+      updated[index] = next;
+      return updated;
+    });
+  };
+
+  const addEntityValueRow = () => {
+    setEntityValues((current) => [...current, ""]);
+  };
+
+  const removeEntityValueRow = (index: number) => {
+    setEntityValues((current) => {
+      const next = current.filter((_, i) => i !== index);
+      return next.length > 0 ? next : [""];
+    });
+  };
+
+  const parseEntityValues = () => {
+    return entityValues
+      .map((entry) =>
+        entry
+          .split(",")
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0)
+      )
+      .filter((parts) => parts.length > 0)
+      .map((parts) => ({
+        value: parts[0],
+        synonyms: parts.slice(1).length > 0 ? parts.slice(1) : undefined,
+      }));
+  };
+
+  const submitEntityModal = async () => {
+    try {
+      const values = await entityForm.validateFields();
+      const name = (values.name || "").trim();
+      if (!name) return;
+      const normalizedValues = parseEntityValues();
+      dispatch(
+        addEntityDetailed({
+          name,
+          dataType: values.dataType,
+          description: values.description?.trim() || undefined,
+          values: normalizedValues.length ? normalizedValues : undefined,
+        })
+      );
+      appendEntityToIntent(name);
+      setEntityModalOpen(false);
+    } catch (error) {
+      // ignore validation errors
+    }
+  };
+
+  const handleBulkImport = () => {
+    const entries = bulkImportText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    setEntityValues(entries.length > 0 ? entries : [""]);
+    setBulkModalOpen(false);
+    setBulkImportText("");
+  };
+
+  const handleSelectEntity = (entityName: string) => {
+    appendEntityToIntent(entityName);
+    setEntityPopoverOpen(false);
+  };
+
+  const handleRemoveEntity = (entityName: string) => {
+    setSelectedEntities((current) => current.filter((item) => item !== entityName));
+  };
+
+  const filteredEntityOptions = useMemo(() => {
+    const query = entitySearch.trim().toLowerCase();
+    return entityOptions
+      .filter((option) => !selectedEntities.includes(option.value))
+      .filter((option) =>
+        query ? String(option.label).toLowerCase().includes(query) : true
+      );
+  }, [entityOptions, entitySearch, selectedEntities]);
 
   return (
     <>
@@ -129,7 +268,7 @@ export default function IntentPicker({
         filterOption={false}
         popupMatchSelectWidth={false}
         placement="bottomLeft"
-        getPopupContainer={(node) => {
+        getPopupContainer={() => {
           let container = document.getElementById("intent-picker-portal");
           if (!container) {
             container = document.createElement("div");
@@ -149,8 +288,8 @@ export default function IntentPicker({
             root: {
               zIndex: 99999999,
               position: "fixed",
-              minWidth: 180,
-              maxWidth: 260,
+              minWidth: 200,
+              maxWidth: 280,
             },
           },
         }}
@@ -233,18 +372,27 @@ export default function IntentPicker({
       />
 
       <Modal
-        title="Create Intent"
+        title="Create intent"
         open={modalOpen}
         onCancel={() => setModalOpen(false)}
         onOk={submitModal}
-        okText="Create"
+        okText="Create intent"
         destroyOnClose
         zIndex={100000}
         afterOpenChange={(opened) => {
           if (opened) {
             form.resetFields();
-            form.setFieldsValue({ name: search.trim() });
+            form.setFieldsValue({
+              name: search.trim(),
+              utterances: search.trim() ? [search.trim()] : [""],
+            });
+            setSelectedEntities([]);
+            setEntitySearch("");
           }
+        }}
+        afterClose={() => {
+          setSelectedEntities([]);
+          setEntitySearch("");
         }}
       >
         <Form form={form} layout="vertical" preserve={false}>
@@ -253,25 +401,317 @@ export default function IntentPicker({
             label="Name"
             rules={[{ required: true, message: "Name is required" }]}
           >
-            <Input placeholder="e.g. order_status" autoFocus />
+            <Input placeholder="Enter intent name" autoFocus />
+          </Form.Item>
+          <Form.Item name="description" label="Description">
+            <Input placeholder="Trigger this intent when…" />
+          </Form.Item>
+          <Form.List name="utterances">
+            {(fields, { add, remove }) => (
+              <Form.Item
+                label={
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                    }}
+                  >
+                    <div>
+                      <div>Utterances</div>
+                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        Enter sample phrase or {"{entity}"}
+                      </Typography.Text>
+                    </div>
+                    <Button
+                      type="default"
+                      size="small"
+                      icon={<ThunderboltOutlined />}
+                      disabled
+                    >
+                      Generate
+                    </Button>
+                  </div>
+                }
+              >
+                <Space direction="vertical" style={{ width: "100%" }}>
+                  {fields.length === 0 && (
+                    <Typography.Text type="secondary">
+                      No utterances yet
+                    </Typography.Text>
+                  )}
+                  {fields.map((field) => (
+                    <Space
+                      key={field.key}
+                      align="start"
+                      style={{ width: "100%" }}
+                    >
+                      <Form.Item
+                        {...field}
+                        style={{ flex: 1 }}
+                        rules={[
+                          {
+                            required: true,
+                            message: "Utterance cannot be empty",
+                          },
+                        ]}
+                      >
+                        <Input placeholder="Enter sample phrase or {entity}" />
+                      </Form.Item>
+                      <Button
+                        type="text"
+                        icon={<MinusCircleOutlined />}
+                        onClick={() => remove(field.name)}
+                      />
+                    </Space>
+                  ))}
+                  <Button
+                    type="dashed"
+                    icon={<PlusOutlined />}
+                    onClick={() => add("")}
+                    style={{ width: "100%" }}
+                  >
+                    Add utterance
+                  </Button>
+                </Space>
+              </Form.Item>
+            )}
+          </Form.List>
+          <Form.Item
+            label={
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                }}
+              >
+                <span>Required entities</span>
+                <Popover
+                  trigger="click"
+                  placement="bottomRight"
+                  open={entityPopoverOpen}
+                  onOpenChange={(nextOpen) => {
+                    setEntityPopoverOpen(nextOpen);
+                    if (nextOpen) {
+                      setEntitySearch("");
+                    }
+                  }}
+                  content={
+                    <div style={{ width: 240 }}>
+                      <Input
+                        placeholder="Search"
+                        value={entitySearch}
+                        onChange={(event) => setEntitySearch(event.target.value)}
+                        size="small"
+                        style={{ marginBottom: 8 }}
+                        autoFocus
+                      />
+                      <div
+                        style={{
+                          maxHeight: 200,
+                          overflowY: "auto",
+                          marginBottom: 8,
+                        }}
+                      >
+                        {filteredEntityOptions.length === 0 ? (
+                          <Empty
+                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                            description="No matches"
+                          />
+                        ) : (
+                          <Space direction="vertical" style={{ width: "100%" }}>
+                            {filteredEntityOptions.map((option) => (
+                              <Button
+                                key={option.value}
+                                type="text"
+                                style={{ justifyContent: "flex-start" }}
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => handleSelectEntity(option.value)}
+                              >
+                                {option.label}
+                              </Button>
+                            ))}
+                          </Space>
+                        )}
+                      </div>
+                      <Divider style={{ margin: "4px 0" }} />
+                      <Button
+                        type="link"
+                        icon={<PlusOutlined />}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          setPendingEntityName(entitySearch.trim());
+                          setEntityModalOpen(true);
+                          setEntityPopoverOpen(false);
+                        }}
+                        style={{ padding: 0 }}
+                      >
+                        Create entity
+                      </Button>
+                    </div>
+                  }
+                >
+                  <Button
+                    type="text"
+                    icon={<PlusOutlined />}
+                    onMouseDown={(event) => event.preventDefault()}
+                  />
+                </Popover>
+              </div>
+            }
+          >
+            <Space size={[8, 8]} wrap>
+              {selectedEntities.length === 0 ? (
+                <Typography.Text type="secondary">
+                  No required entities
+                </Typography.Text>
+              ) : (
+                selectedEntities.map((entity) => (
+                  <Tag
+                    key={entity}
+                    closable
+                    onClose={() => handleRemoveEntity(entity)}
+                  >
+                    {entity}
+                  </Tag>
+                ))
+              )}
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="Create entity"
+        open={entityModalOpen}
+        onCancel={() => {
+          setEntityModalOpen(false);
+        }}
+        onOk={submitEntityModal}
+        okText="Create entity"
+        destroyOnClose
+        zIndex={100001}
+        afterOpenChange={(opened) => {
+          if (opened) {
+            resetEntityModalState();
+            entityForm.setFieldsValue({
+              name: pendingEntityName,
+              dataType: "custom",
+            });
+            setEntityValues([""]);
+          }
+        }}
+        afterClose={() => {
+          resetEntityModalState();
+          setPendingEntityName("");
+        }}
+      >
+        <Form form={entityForm} layout="vertical" preserve={false}>
+          <Form.Item
+            name="name"
+            label="Name"
+            rules={[{ required: true, message: "Entity name is required" }]}
+          >
+            <Input placeholder="Enter entity name" autoFocus />
+          </Form.Item>
+          <Form.Item name="dataType" label="Data type">
+            <Select
+              options={[
+                { label: "Custom", value: "custom" },
+                { label: "Number", value: "number" },
+                { label: "Date", value: "date" },
+                { label: "Color", value: "color" },
+                { label: "Location", value: "location" },
+              ]}
+              placeholder="Select type"
+            />
           </Form.Item>
           <Form.Item name="description" label="Description">
             <Input placeholder="Optional description" />
           </Form.Item>
           <Form.Item
-            name="utterances"
             label={
-              <div>
-                <div>Sample utterances</div>
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  Separate with commas
-                </Typography.Text>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                }}
+              >
+                <span>Values</span>
+                <Space>
+                  <Button
+                    type="default"
+                    size="small"
+                    icon={<InboxOutlined />}
+                    onClick={() => setBulkModalOpen(true)}
+                  >
+                    Bulk import
+                  </Button>
+                  <Button
+                    type="default"
+                    size="small"
+                    icon={<PlusOutlined />}
+                    onClick={addEntityValueRow}
+                  >
+                    Add value
+                  </Button>
+                </Space>
               </div>
             }
           >
-            <Input placeholder="e.g. track my order, where is my package" />
+            <Space direction="vertical" style={{ width: "100%" }}>
+              {entityValues.map((entry, index) => (
+                <Space
+                  key={`entity-value-${index}`}
+                  align="start"
+                  style={{ width: "100%" }}
+                >
+                  <Input
+                    value={entry}
+                    onChange={(event) =>
+                      handleEntityValueChange(index, event.target.value)
+                    }
+                    placeholder="Add synonyms, comma separated"
+                  />
+                  <Button
+                    type="text"
+                    icon={<MinusCircleOutlined />}
+                    onClick={() => removeEntityValueRow(index)}
+                  />
+                </Space>
+              ))}
+            </Space>
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title="Bulk import entity values"
+        open={bulkModalOpen}
+        onCancel={() => {
+          setBulkModalOpen(false);
+          setBulkImportText("");
+        }}
+        onOk={handleBulkImport}
+        okText="Import"
+        cancelText="Close"
+        destroyOnClose
+        zIndex={100002}
+      >
+        <Typography.Paragraph type="secondary">
+          Format: value, synonym 1, synonym 2 (one per line)
+        </Typography.Paragraph>
+        <Input.TextArea
+          value={bulkImportText}
+          onChange={(event) => setBulkImportText(event.target.value)}
+          placeholder="Enter values, or drop CSV here"
+          autoSize={{ minRows: 6, maxRows: 10 }}
+        />
       </Modal>
     </>
   );

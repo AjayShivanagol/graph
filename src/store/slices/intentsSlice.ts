@@ -5,6 +5,7 @@ export interface IntentDetail {
   description?: string;
   utterances?: string[];
   color?: string;
+  requiredEntities?: string[];
 }
 
 export interface IntentsState {
@@ -48,6 +49,11 @@ export const intentsSlice = createSlice({
         description: payload.description?.trim() || undefined,
         utterances: Array.isArray(payload.utterances)
           ? payload.utterances.filter((item) => !!item && item.trim().length > 0)
+          : undefined,
+        requiredEntities: Array.isArray(payload.requiredEntities)
+          ? payload.requiredEntities
+              .map((entry) => entry.trim())
+              .filter((entry) => entry.length > 0)
           : undefined,
       };
     },
