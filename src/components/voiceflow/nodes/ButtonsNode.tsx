@@ -159,12 +159,16 @@ export default function ButtonsNode({
                   >
                     {label || "Add button label"}
                   </span>
-                  <Handle
-                    type="source"
-                    position={Position.Right}
-                    id={`button-${button.id}`}
+                  <div
                     className={`${styles.handle} ${styles["handle--button"]}`}
-                  />
+                  >
+                    <Handle
+                      type="source"
+                      position={Position.Right}
+                      id={`button-${button.id}`}
+                      className={styles.handleInner}
+                    />
+                  </div>
                 </div>
               );
             })
@@ -191,11 +195,13 @@ export default function ButtonsNode({
         )}
       </div>
 
-      <Handle
-        type="target"
-        position={Position.Top}
-        className={`${styles.handle} ${styles["handle--top"]}`}
-      />
+      <div className={`${styles.handle} ${styles["handle--top"]}`}>
+        <Handle
+          type="target"
+          position={Position.Top}
+          className={styles.handleInner}
+        />
+      </div>
     </div>
   );
 }
