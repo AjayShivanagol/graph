@@ -3471,47 +3471,52 @@ export default function PropertiesPanel({
         });
       };
 
-    const renderButtonEditor = (button: ButtonsNodeButton) => (
-      <div className={styles.buttonsNodeEditor}>
-        <Typography.Text className={styles.buttonsNodeEditorTitle}>
-          Button
-        </Typography.Text>
-        <ValueInput
-          ref={(instance) => {
-            if (instance) {
-              buttonLabelRefs.current[button.id] = instance;
-            } else {
-              delete buttonLabelRefs.current[button.id];
+    const renderButtonEditor = (button: ButtonsNodeButton) => {
+      const canRenderAddAnother = buttonsStateRef.current.length < 10;
+      const isAddAnotherDisabled = button.label.trim().length === 0;
+
+      return (
+        <div className={styles.buttonsNodeEditor}>
+          <Typography.Text className={styles.buttonsNodeEditorTitle}>
+            Button
+          </Typography.Text>
+          <ValueInput
+            ref={(instance) => {
+              if (instance) {
+                buttonLabelRefs.current[button.id] = instance;
+              } else {
+                delete buttonLabelRefs.current[button.id];
+              }
+            }}
+            value={button.label}
+            onChange={(value) =>
+              updateButtonLocal(button.id, { label: value })
             }
-          }}
-          value={button.label}
-          onChange={(value) =>
-            updateButtonLocal(button.id, { label: value })
-          }
-          onBlur={() => persistButtons()}
-          onPressEnter={() => {
-            persistButtons();
-            setActiveButtonId(null);
-          }}
-          placeholder="Enter button label or {variable}"
-          size="large"
-        />
-        <div className={styles.buttonsNodeMatchRow}>
-          <span className={styles.buttonsNodeMatchLabel}>Match type</span>
-          <Select
-            value={button.matchType}
-            onChange={(value: ButtonMatchType) =>
-              updateButtonLocal(button.id, { matchType: value }, { persist: true })
-            }
-            options={[
-              { value: "exact", label: "Match exact" },
-              { value: "any", label: "Match any" },
-            ]}
-            className={styles.buttonsNodeMatchSelect}
+            onBlur={() => persistButtons()}
+            onPressEnter={() => {
+              persistButtons();
+              setActiveButtonId(null);
+            }}
+            placeholder="Enter button label or {variable}"
+            size="large"
           />
+          {canRenderAddAnother && (
+            <Button
+              block
+              type="default"
+              className={styles.buttonsNodeAddAnother}
+              disabled={isAddAnotherDisabled}
+              onClick={() => {
+                persistButtons();
+                addButton();
+              }}
+            >
+              Add another
+            </Button>
+          )}
         </div>
-      </div>
-    );
+      );
+    };
 
     const rawNoMatch = selectedNode.data.noMatch as
       | ButtonsFallbackConfig
@@ -4015,7 +4020,7 @@ export default function PropertiesPanel({
           )}
           {buttonsState.map((button) => {
             const isActive = activeButtonId === button.id;
-            const displayLabel = button.label.trim() || "New button (inactive)";
+            const displayLabel = button.label.trim() || "Add button label";
             return (
               <Popover
                 key={button.id}

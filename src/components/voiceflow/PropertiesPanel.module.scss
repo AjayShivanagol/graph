@@ -1349,6 +1349,7 @@
   }
 }
 
+
 .buttonsNodeEditor {
   display: flex;
   flex-direction: column;
@@ -1377,22 +1378,19 @@
   color: #0f172a;
 }
 
-.buttonsNodeMatchRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
+.buttonsNodeAddAnother {
+  margin-top: 4px;
+  align-self: stretch;
+  height: 36px;
+  border-radius: 10px;
+  font-weight: 600;
 
-.buttonsNodeMatchLabel {
-  font-size: 13px;
-  color: #475569;
-  font-weight: 500;
-}
-
-.buttonsNodeMatchSelect {
-  min-width: 160px;
-  flex: 1;
+  &:disabled {
+    color: #94a3b8 !important;
+    border-color: #e2e8f0 !important;
+    background: #f8fafc !important;
+    box-shadow: none;
+  }
 }
 
 .buttonsNodeDivider {
