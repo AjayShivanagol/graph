@@ -1100,7 +1100,6 @@
   font-size: 12px;
   font-weight: 600;
   color: #4b5563;
-  text-transform: uppercase;
   letter-spacing: 0.4px;
   margin: 12px 0 8px;
 }
@@ -1709,27 +1708,75 @@
   color: #334155;
 }
 
-.buttonsPathLabelCard {
+.buttonsPathLabelTrigger {
   margin-top: 12px;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
+  width: 100%;
+  border: 1px solid #dbe4f0;
   border-radius: 14px;
+  background: #f8fbff;
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  appearance: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover,
+  &:focus-visible {
+    border-color: #9ab4ec;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+    outline: none;
+  }
 }
 
-.buttonsPathLabelTitle {
+.buttonsPathLabelTriggerTitle {
   font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  color: #64748b;
-  letter-spacing: 0.04em;
+  color: #475569;
+  letter-spacing: 0.02em;
+}
+
+.buttonsPathLabelTriggerValue {
+  font-size: 13px;
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.buttonsPathLabelPopover {
+  :global(.ant-popover-inner) {
+    border-radius: 16px;
+    padding: 16px;
+    width: 260px;
+  }
+
+  :global(.ant-popover-arrow) {
+    display: none;
+  }
+}
+
+.buttonsPathLabelPopoverContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.buttonsPathLabelPopoverTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
 }
 
 .buttonsPathLabelInput {
   border-radius: 10px;
+}
+
+.buttonsPathLabelDone {
+  border-radius: 12px;
+  height: 36px;
+  font-weight: 600;
 }
 
 .buttonsLinkPopover {

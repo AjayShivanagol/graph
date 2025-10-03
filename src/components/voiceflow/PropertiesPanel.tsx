@@ -3546,6 +3546,9 @@ export default function PropertiesPanel({
     const [editingRepromptIndex, setEditingRepromptIndex] = useState<
       number | null
     >(null);
+    const [pathLabelPopover, setPathLabelPopover] = useState<
+      "noMatch" | "noReply" | null
+    >(null);
 
     useEffect(() => {
       setNoMatchConfig(
@@ -3586,6 +3589,12 @@ export default function PropertiesPanel({
     useEffect(() => {
       setFallbackPopover(null);
     }, [selectedNodeId]);
+
+    useEffect(() => {
+      if (!fallbackPopover) {
+        setPathLabelPopover(null);
+      }
+    }, [fallbackPopover]);
 
     const commitNoMatch = (next: ButtonsFallbackConfig) => {
       setNoMatchConfig(next);
@@ -3833,7 +3842,7 @@ export default function PropertiesPanel({
             </span>
             <Switch
               checked={!!safeDraft.followPath}
-              onChange={(checked) =>
+              onChange={(checked) => {
                 updateDraft((current) => {
                   const ensuredCurrent = ensureFallbackReprompts(current);
                   return {
@@ -3845,29 +3854,85 @@ export default function PropertiesPanel({
                         : options.followPathLabel || ""
                       : ensuredCurrent.pathLabel,
                   };
-                })
-              }
+                });
+                setPathLabelPopover((current) => {
+                  if (checked) {
+                    return options.context;
+                  }
+                  return current === options.context ? null : current;
+                });
+              }}
             />
           </div>
           {safeDraft.followPath && (
-            <div className={styles.buttonsPathLabelCard}>
-              <span className={styles.buttonsPathLabelTitle}>Path label</span>
-              <Input
-                value={safeDraft.pathLabel || ""}
-                onChange={(event) => {
-                  const { value } = event.target;
-                  updateDraft((current) => ({
-                    ...ensureFallbackReprompts(current),
-                    pathLabel: value,
-                  }));
-                }}
-                placeholder={
-                  options.followPathLabel ||
-                  `Enter ${options.context === "noMatch" ? "no match" : "no reply"} label`
-                }
-                className={styles.buttonsPathLabelInput}
-              />
-            </div>
+            <Popover
+              trigger={["click"]}
+              destroyTooltipOnHide
+              placement="left"
+              overlayClassName={styles.buttonsPathLabelPopover}
+              open={pathLabelPopover === options.context}
+              onOpenChange={(open) => {
+                setPathLabelPopover((current) => {
+                  if (open) {
+                    return options.context;
+                  }
+                  return current === options.context ? null : current;
+                });
+              }}
+              content={
+                <div className={styles.buttonsPathLabelPopoverContent}>
+                  <Typography.Text className={styles.buttonsPathLabelPopoverTitle}>
+                    Path label
+                  </Typography.Text>
+                  <Input
+                    autoFocus
+                    value={safeDraft.pathLabel || ""}
+                    onChange={(event) => {
+                      const { value } = event.target;
+                      updateDraft((current) => ({
+                        ...ensureFallbackReprompts(current),
+                        pathLabel: value,
+                      }));
+                    }}
+                    placeholder={
+                      options.followPathLabel ||
+                      `Enter ${options.context === "noMatch" ? "no match" : "no reply"} label`
+                    }
+                    className={styles.buttonsPathLabelInput}
+                    onPressEnter={() =>
+                      setPathLabelPopover((current) =>
+                        current === options.context ? null : current
+                      )
+                    }
+                  />
+                  <Button
+                    type="primary"
+                    className={styles.buttonsPathLabelDone}
+                    onClick={() =>
+                      setPathLabelPopover((current) =>
+                        current === options.context ? null : current
+                      )
+                    }
+                  >
+                    Done
+                  </Button>
+                </div>
+              }
+            >
+              <button
+                type="button"
+                className={styles.buttonsPathLabelTrigger}
+              >
+                <span className={styles.buttonsPathLabelTriggerTitle}>
+                  Path label
+                </span>
+                <span className={styles.buttonsPathLabelTriggerValue}>
+                  {safeDraft.pathLabel?.trim() ||
+                    options.followPathLabel ||
+                    `Enter ${options.context === "noMatch" ? "no match" : "no reply"} label`}
+                </span>
+              </button>
+            </Popover>
           )}
         </div>
       );
@@ -3885,9 +3950,13 @@ export default function PropertiesPanel({
             } else {
               setDraftNoReply(ensureFallbackReprompts(noReplyConfig));
             }
+            setPathLabelPopover(null);
             return key;
           }
           commitDraftConfig(key);
+          setPathLabelPopover((current) =>
+            current === key ? null : current
+          );
           return prev === key ? null : prev;
         });
       };
