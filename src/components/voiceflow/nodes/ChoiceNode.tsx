@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { ForkOutlined } from '@ant-design/icons';
 import { useAppDispatch } from '../../../store/hooks';
@@ -10,7 +10,43 @@ export default function ChoiceNode({ id, data, selected }: NodeProps<any>) {
   const dispatch = useAppDispatch();
   const [editing, setEditing] = useState<boolean>(!!data.__editingLabel);
   const [label, setLabel] = useState<string>(data.label || '');
-  const choices = data.choices || ['Choice A', 'Choice B'];
+
+  const normalizedChoices = useMemo(() => {
+    if (!Array.isArray(data.choices)) {
+      return [
+        { id: 'choice-0', label: 'Choice A' },
+        { id: 'choice-1', label: 'Choice B' },
+      ];
+    }
+    const mapped = data.choices.map((choice: any, index: number) => {
+      if (typeof choice === 'string') {
+        return { id: `choice-${index}`, label: choice };
+      }
+      if (choice && typeof choice === 'object') {
+        const choiceId =
+          typeof choice.id === 'string' ? choice.id : `choice-${index}`;
+        const rawLabel =
+          typeof choice.label === 'string'
+            ? choice.label
+            : typeof choice.text === 'string'
+            ? choice.text
+            : '';
+        const trimmedLabel = (rawLabel || '').trim();
+        return {
+          id: choiceId,
+          label: trimmedLabel || rawLabel || `Choice ${index + 1}`,
+        };
+      }
+      return { id: `choice-${index}`, label: `Choice ${index + 1}` };
+    });
+    if (mapped.length === 0) {
+      return [
+        { id: 'choice-0', label: 'Choice A' },
+        { id: 'choice-1', label: 'Choice B' },
+      ];
+    }
+    return mapped;
+  }, [data.choices]);
 
   useEffect(() => {
     setEditing(!!data.__editingLabel);
@@ -60,15 +96,17 @@ export default function ChoiceNode({ id, data, selected }: NodeProps<any>) {
           </div>
         )}
         <div>
-          {choices.slice(0, 3).map((choice: string, index: number) => (
+          {normalizedChoices.slice(0, 3).map((choice, index: number) => (
             <div key={index} className={styles.choiceItem}>
               <div className={styles.choiceDot}></div>
-              <div className={styles.choiceText}>{choice}</div>
+              <div className={styles.choiceText}>
+                {choice.label || `Choice ${index + 1}`}
+              </div>
             </div>
           ))}
-          {choices.length > 3 && (
+          {normalizedChoices.length > 3 && (
             <div className={styles.moreChoices}>
-              +{choices.length - 3} more choices
+              +{normalizedChoices.length - 3} more choices
             </div>
           )}
         </div>
@@ -79,12 +117,12 @@ export default function ChoiceNode({ id, data, selected }: NodeProps<any>) {
         position={Position.Top}
         className={`${styles.handle} ${styles['handle--top']}`}
       />
-      {choices.map((_choice: string, index: number) => (
+      {normalizedChoices.map((choice, index: number) => (
         <Handle
-          key={index}
+          key={choice.id || index}
           type="source"
           position={Position.Right}
-          id={`choice-${index}`}
+          id={choice.id || `choice-${index}`}
           className={`${styles.handle} ${styles['handle--right']}`}
           style={{
             top: `${30 + (index * 40)}%`,

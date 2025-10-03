@@ -50,6 +50,7 @@ import {
 import type { MenuProps } from "antd";
 import Editor from "@monaco-editor/react";
 import VariablePicker from "../common/VariablePicker";
+import IntentPicker from "../common/IntentPicker";
 import PromptPicker from "../common/PromptPicker";
 import PromptEditor from "../common/PromptEditor";
 import ValueInput, { ValueInputHandle } from "../common/ValueInput";
@@ -101,6 +102,124 @@ interface ButtonsNodeButton {
   label: string;
   matchType: ButtonMatchType;
 }
+
+interface ChoiceOption {
+  id: string;
+  label: string;
+  intent?: string;
+  buttonLabel?: string;
+  automaticallyReprompt?: boolean;
+}
+
+const generateChoiceId = () =>
+  `choice-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}`;
+
+const ensureChoiceOption = (choice: any, index: number): ChoiceOption => {
+  const fallbackId = `choice-${index}`;
+  if (!choice) {
+    return {
+      id: fallbackId,
+      label: `Choice ${index + 1}`,
+      automaticallyReprompt: false,
+    };
+  }
+
+  if (typeof choice === "string") {
+    return {
+      id: fallbackId,
+      label: choice,
+      automaticallyReprompt: false,
+    };
+  }
+
+  const rawLabel =
+    typeof choice.label === "string"
+      ? choice.label
+      : typeof choice.text === "string"
+      ? choice.text
+      : undefined;
+  const rawIntent =
+    typeof choice.intent === "string"
+      ? choice.intent
+      : typeof choice.intentName === "string"
+      ? choice.intentName
+      : undefined;
+  const rawButtonLabel =
+    typeof choice.buttonLabel === "string"
+      ? choice.buttonLabel
+      : typeof choice.button === "string"
+      ? choice.button
+      : undefined;
+  const reprompt =
+    typeof choice.automaticallyReprompt === "boolean"
+      ? choice.automaticallyReprompt
+      : typeof choice.autoReprompt === "boolean"
+      ? choice.autoReprompt
+      : false;
+
+  return {
+    id: typeof choice.id === "string" ? choice.id : fallbackId,
+    label: typeof rawLabel === "string" ? rawLabel : `Choice ${index + 1}`,
+    intent: typeof rawIntent === "string" ? rawIntent : undefined,
+    buttonLabel: typeof rawButtonLabel === "string" ? rawButtonLabel : undefined,
+    automaticallyReprompt: reprompt,
+  };
+};
+
+const normalizeChoiceOptions = (choices: any[]): ChoiceOption[] => {
+  if (!Array.isArray(choices)) return [];
+  return choices.map((choice, index) => {
+    const ensured = ensureChoiceOption(choice, index);
+    const rawLabel = typeof ensured.label === "string" ? ensured.label : "";
+    const trimmedLabel = rawLabel.trim();
+    const rawIntent = typeof ensured.intent === "string" ? ensured.intent : "";
+    const rawButtonLabel =
+      typeof ensured.buttonLabel === "string" ? ensured.buttonLabel : "";
+    return {
+      id: ensured.id,
+      label:
+        trimmedLabel.length > 0
+          ? trimmedLabel
+          : rawLabel.length > 0
+          ? rawLabel
+          : `Choice ${index + 1}`,
+      intent: rawIntent.trim() || undefined,
+      buttonLabel: rawButtonLabel.trim() || undefined,
+      automaticallyReprompt: !!ensured.automaticallyReprompt,
+    };
+  });
+};
+
+const choicesEqual = (
+  left: ChoiceOption[] = [],
+  right: ChoiceOption[] = []
+): boolean => {
+  if (left.length !== right.length) return false;
+  for (let i = 0; i < left.length; i += 1) {
+    const a = left[i];
+    const b = right[i];
+    if (!b) return false;
+    if (a.id !== b.id) return false;
+    if ((a.label || "") !== (b.label || "")) return false;
+    if ((a.intent || "") !== (b.intent || "")) return false;
+    if ((a.buttonLabel || "") !== (b.buttonLabel || "")) return false;
+    if (!!a.automaticallyReprompt !== !!b.automaticallyReprompt) return false;
+  }
+  return true;
+};
+
+const createDefaultChoiceList = (): ChoiceOption[] => [
+  {
+    id: generateChoiceId(),
+    label: "Choice A",
+    automaticallyReprompt: false,
+  },
+  {
+    id: generateChoiceId(),
+    label: "Choice B",
+    automaticallyReprompt: false,
+  },
+];
 
 const buttonsEqual = (
   a: ButtonsNodeButton[],
@@ -1601,6 +1720,38 @@ const ButtonListEditor: React.FC<ButtonListEditorProps> = ({
                                     actions: normalizeButtonActions(updated),
                                   }));
                                 }}
+                              />
+                            )}
+                            {action.type === "go_to_intent" && (
+                              <IntentPicker
+                                value={(action.data?.intent as string) || ""}
+                                onChange={(nextIntent) => {
+                                  const trimmed = (nextIntent || "").trim();
+                                  const updated = (
+                                    drawerButton.actions || []
+                                  ).map((a) => {
+                                    if (a.id !== action.id) return a;
+                                    const nextData = { ...(a.data || {}) };
+                                    if (trimmed) {
+                                      nextData.intent = trimmed;
+                                    } else {
+                                      delete nextData.intent;
+                                    }
+                                    return {
+                                      ...a,
+                                      data: nextData,
+                                    };
+                                  });
+                                  updateDrawerButton((current) => ({
+                                    ...current,
+                                    actions: normalizeButtonActions(updated),
+                                  }));
+                                }}
+                                placeholder="Select or create intent"
+                                allowCreate
+                                allowClear
+                                createMode="modal"
+                                size="middle"
                               />
                             )}
                             {action.type === "open_url" && (
@@ -3351,6 +3502,294 @@ export default function PropertiesPanel({
     );
   };
 
+  const ChoiceProperties = () => {
+    const rawChoices = selectedNode.data.choices as any[] | undefined;
+    const normalizedChoices = useMemo(
+      () =>
+        normalizeChoiceOptions(
+          Array.isArray(rawChoices) ? rawChoices : []
+        ),
+      [rawChoices]
+    );
+    const initialChoices =
+      normalizedChoices.length > 0
+        ? normalizedChoices
+        : createDefaultChoiceList();
+    const [choicesState, setChoicesState] =
+      useState<ChoiceOption[]>(initialChoices);
+    const choicesRef = useRef<ChoiceOption[]>(initialChoices);
+    const [activeChoiceId, setActiveChoiceId] = useState<string | null>(null);
+    const [draftChoice, setDraftChoice] = useState<ChoiceOption | null>(null);
+
+    useEffect(() => {
+      const next =
+        normalizedChoices.length > 0
+          ? normalizedChoices
+          : createDefaultChoiceList();
+      if (!choicesEqual(next, choicesRef.current)) {
+        setChoicesState(next);
+      }
+      choicesRef.current = next;
+      setActiveChoiceId(null);
+      setDraftChoice(null);
+    }, [normalizedChoices, selectedNodeId]);
+
+    useEffect(() => {
+      choicesRef.current = choicesState;
+    }, [choicesState]);
+
+    const persistChoices = (next?: ChoiceOption[]) => {
+      const payload = next ?? choicesRef.current;
+      const sanitized = normalizeChoiceOptions(payload);
+      if (choicesEqual(sanitized, normalizedChoices)) {
+        return;
+      }
+      handleUpdateNode("choices", sanitized);
+    };
+
+    useEffect(() => {
+      return () => {
+        persistChoices();
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedNodeId]);
+
+    const updateChoice = (
+      id: string,
+      patch: Partial<ChoiceOption>,
+      options: { persist?: boolean } = {}
+    ) => {
+      setChoicesState((current) => {
+        const next = current.map((choice) =>
+          choice.id === id ? { ...choice, ...patch } : choice
+        );
+        choicesRef.current = next;
+        if (options.persist) {
+          persistChoices(next);
+        }
+        return next;
+      });
+    };
+
+    const addChoice = () => {
+      const newChoice: ChoiceOption = {
+        id: generateChoiceId(),
+        label: `Choice ${choicesRef.current.length + 1}`,
+        automaticallyReprompt: false,
+      };
+      const next = [...choicesRef.current, newChoice];
+      setChoicesState(next);
+      choicesRef.current = next;
+      persistChoices(next);
+      setActiveChoiceId(newChoice.id);
+      setDraftChoice({ ...newChoice });
+    };
+
+    const removeChoice = (id: string) => {
+      const next = choicesRef.current.filter((choice) => choice.id !== id);
+      setChoicesState(next);
+      choicesRef.current = next;
+      persistChoices(next);
+      if (activeChoiceId === id) {
+        setActiveChoiceId(null);
+        setDraftChoice(null);
+      }
+    };
+
+    const closePopover = useCallback(() => {
+      setActiveChoiceId(null);
+      setDraftChoice(null);
+    }, []);
+
+    const saveDraftChoice = () => {
+      if (!draftChoice) return;
+      const trimmedIntent = (draftChoice.intent || "").trim();
+      const trimmedButton = (draftChoice.buttonLabel || "").trim();
+      updateChoice(
+        draftChoice.id,
+        {
+          intent: trimmedIntent || undefined,
+          buttonLabel: trimmedButton.length > 0 ? trimmedButton : undefined,
+          automaticallyReprompt: !!draftChoice.automaticallyReprompt,
+        },
+        { persist: true }
+      );
+      closePopover();
+    };
+
+    return (
+      <div className={styles.choiceProperties}>
+        <Typography.Text className={styles.sectionHeading}>
+          Choices
+        </Typography.Text>
+        <div className={styles.choiceList}>
+          {choicesState.length === 0 ? (
+            <Typography.Text type="secondary" className={styles.choiceEmpty}>
+              No choices yet. Add one to branch your flow.
+            </Typography.Text>
+          ) : (
+            choicesState.map((choice) => {
+              const isActive = activeChoiceId === choice.id;
+              const effectiveChoice =
+                isActive && draftChoice ? draftChoice : choice;
+              return (
+                <div key={choice.id} className={styles.choiceItem}>
+                  <div className={styles.choiceItemHeader}>
+                    <ValueInput
+                      value={choice.label}
+                      onChange={(value) =>
+                        updateChoice(choice.id, { label: value })
+                      }
+                      onBlur={() => persistChoices()}
+                      onPressEnter={() => {
+                        persistChoices();
+                        setActiveChoiceId(null);
+                      }}
+                      placeholder="Enter choice label or {variable}"
+                      size="large"
+                      className={styles.choiceLabelInput}
+                    />
+                    <div className={styles.choiceItemActions}>
+                      <Popover
+                        trigger="click"
+                        open={isActive}
+                        onOpenChange={(open) => {
+                          if (open) {
+                            setActiveChoiceId(choice.id);
+                            setDraftChoice({ ...choice });
+                          } else {
+                            closePopover();
+                          }
+                        }}
+                        placement="right"
+                        overlayClassName={styles.choicePopoverOverlay}
+                        content={
+                          <div className={styles.choicePopover}>
+                            <Typography.Text
+                              className={styles.choicePopoverTitle}
+                            >
+                              Choice settings
+                            </Typography.Text>
+                            <Form layout="vertical">
+                              <Form.Item label="Intent">
+                                <IntentPicker
+                                  value={effectiveChoice.intent || ""}
+                                  onChange={(nextIntent) => {
+                                    setDraftChoice((current) => {
+                                      if (!current || current.id !== choice.id)
+                                        return current;
+                                      return {
+                                        ...current,
+                                        intent: nextIntent,
+                                      };
+                                    });
+                                  }}
+                                  placeholder="Select or create intent"
+                                  allowCreate
+                                  allowClear
+                                  createMode="modal"
+                                  size="middle"
+                                />
+                              </Form.Item>
+                              <Form.Item label="Button label">
+                                <Input
+                                  value={effectiveChoice.buttonLabel || ""}
+                                  onChange={(event) => {
+                                    const nextValue = event.target.value;
+                                    setDraftChoice((current) => {
+                                      if (!current || current.id !== choice.id)
+                                        return current;
+                                      return {
+                                        ...current,
+                                        buttonLabel: nextValue,
+                                      };
+                                    });
+                                  }}
+                                  placeholder="Optional button label"
+                                />
+                              </Form.Item>
+                              <Form.Item label="Automatically reprompt">
+                                <Switch
+                                  checked={
+                                    !!effectiveChoice.automaticallyReprompt
+                                  }
+                                  onChange={(checked) => {
+                                    setDraftChoice((current) => {
+                                      if (!current || current.id !== choice.id)
+                                        return current;
+                                      return {
+                                        ...current,
+                                        automaticallyReprompt: checked,
+                                      };
+                                    });
+                                  }}
+                                />
+                              </Form.Item>
+                            </Form>
+                            <div className={styles.choicePopoverFooter}>
+                              <Button onClick={closePopover}>Cancel</Button>
+                              <Button type="primary" onClick={saveDraftChoice}>
+                                Save
+                              </Button>
+                            </div>
+                          </div>
+                        }
+                      >
+                        <Button
+                          type="link"
+                          size="small"
+                          className={styles.choiceConfigureButton}
+                        >
+                          Configure
+                        </Button>
+                      </Popover>
+                      <Button
+                        type="text"
+                        icon={<MinusOutlined />}
+                        onClick={() => removeChoice(choice.id)}
+                        className={styles.choiceRemoveButton}
+                      />
+                    </div>
+                  </div>
+                  <div className={styles.choiceSummary}>
+                    <div className={styles.choiceSummaryRow}>
+                      <span className={styles.choiceSummaryLabel}>Intent</span>
+                      <span className={styles.choiceSummaryValue}>
+                        {choice.intent || "None"}
+                      </span>
+                    </div>
+                    <div className={styles.choiceSummaryRow}>
+                      <span className={styles.choiceSummaryLabel}>Button</span>
+                      <span className={styles.choiceSummaryValue}>
+                        {choice.buttonLabel || "Not configured"}
+                      </span>
+                    </div>
+                    <div className={styles.choiceSummaryRow}>
+                      <span className={styles.choiceSummaryLabel}>
+                        Auto reprompt
+                      </span>
+                      <span className={styles.choiceSummaryValue}>
+                        {choice.automaticallyReprompt ? "On" : "Off"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+        <Button
+          type="dashed"
+          icon={<PlusOutlined />}
+          onClick={addChoice}
+          className={styles.choiceAddButton}
+        >
+          Add choice
+        </Button>
+      </div>
+    );
+  };
+
   const ButtonsProperties = () => {
     const rawButtons = selectedNode.data.buttons as
       | ButtonsNodeButton[]
@@ -4404,6 +4843,8 @@ export default function PropertiesPanel({
         return <EmailProperties />;
       case "set":
         return <SetProperties />;
+      case "choice":
+        return <ChoiceProperties />;
       case "buttons":
         return <ButtonsProperties />;
       case "card":

@@ -1279,6 +1279,118 @@
   padding: 0;
 }
 
+.choiceProperties {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.choiceList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.choiceEmpty {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.choiceItem {
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 12px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+.choiceItemHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.choiceLabelInput {
+  flex: 1;
+}
+
+.choiceItemActions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.choiceConfigureButton {
+  padding: 0;
+  height: auto;
+}
+
+.choiceRemoveButton {
+  color: #94a3b8;
+
+  &:hover {
+    color: #ef4444;
+  }
+}
+
+.choiceSummary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.choiceSummaryRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.choiceSummaryLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.choiceSummaryValue {
+  font-size: 13px;
+  color: #1f2937;
+}
+
+.choiceAddButton {
+  align-self: flex-start;
+}
+
+.choicePopoverOverlay {
+  max-width: 320px;
+}
+
+.choicePopover {
+  width: 260px;
+}
+
+.choicePopover :global(.ant-form-item) {
+  margin-bottom: 12px;
+}
+
+.choicePopoverTitle {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #1f2937;
+}
+
+.choicePopoverFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .buttonsNodeProperties {
   display: flex;
   flex-direction: column;

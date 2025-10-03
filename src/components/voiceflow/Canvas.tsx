@@ -183,6 +183,11 @@ export default function Canvas() {
         imageFileName: "",
         buttons: [createButton("Select")],
       });
+      const createChoice = (label: string) => ({
+        id: `choice-${uniqueId()}`,
+        label,
+        automaticallyReprompt: false,
+      });
 
       const newNode = {
         id: `${type}-${Date.now()}`,
@@ -193,7 +198,9 @@ export default function Canvas() {
           // Default data based on block type
           ...(type === "message" && { text: "Hello! How can I help you?" }),
           ...(type === "buttons" && { options: ["Option 1", "Option 2"] }),
-          ...(type === "choice" && { choices: ["Choice A", "Choice B"] }),
+          ...(type === "choice" && {
+            choices: [createChoice("Choice A"), createChoice("Choice B")],
+          }),
           ...(type === "capture" && { variable: "user_input" }),
           ...(type === "condition" && {
             condition: 'variable == "value"',

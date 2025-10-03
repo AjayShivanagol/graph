@@ -284,6 +284,11 @@ export default function Sidebar() {
       imageFileName: "",
       buttons: [createButton("Select")],
     });
+    const createChoice = (label: string) => ({
+      id: `choice-${uniqueId()}`,
+      label,
+      automaticallyReprompt: false,
+    });
 
     const newNode = {
       id: `${blockType}-${Date.now()}`,
@@ -293,7 +298,9 @@ export default function Sidebar() {
         label: blockName,
         ...(blockType === "message" && { text: "" }),
         ...(blockType === "buttons" && { options: ["Option 1", "Option 2"] }),
-        ...(blockType === "choice" && { choices: ["Choice A", "Choice B"] }),
+        ...(blockType === "choice" && {
+          choices: [createChoice("Choice A"), createChoice("Choice B")],
+        }),
         ...(blockType === "capture" && { variable: "user_input" }),
         ...(blockType === "condition" && {
           condition: 'variable == "value"',
