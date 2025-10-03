@@ -287,7 +287,6 @@ export default function Sidebar() {
     const createChoice = (label: string) => ({
       id: `choice-${uniqueId()}`,
       label,
-      automaticallyReprompt: false,
     });
 
     const newNode = {

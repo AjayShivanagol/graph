@@ -186,7 +186,6 @@ export default function Canvas() {
       const createChoice = (label: string) => ({
         id: `choice-${uniqueId()}`,
         label,
-        automaticallyReprompt: false,
       });
 
       const newNode = {

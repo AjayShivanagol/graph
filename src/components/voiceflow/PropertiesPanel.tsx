@@ -108,7 +108,6 @@ interface ChoiceOption {
   label: string;
   intent?: string;
   buttonLabel?: string;
-  automaticallyReprompt?: boolean;
 }
 
 interface FallbackSettingsProps {
@@ -126,7 +125,6 @@ const ensureChoiceOption = (choice: any, index: number): ChoiceOption => {
     return {
       id: fallbackId,
       label: `Choice ${index + 1}`,
-      automaticallyReprompt: false,
     };
   }
 
@@ -134,7 +132,6 @@ const ensureChoiceOption = (choice: any, index: number): ChoiceOption => {
     return {
       id: fallbackId,
       label: choice,
-      automaticallyReprompt: false,
     };
   }
 
@@ -156,19 +153,11 @@ const ensureChoiceOption = (choice: any, index: number): ChoiceOption => {
       : typeof choice.button === "string"
       ? choice.button
       : undefined;
-  const reprompt =
-    typeof choice.automaticallyReprompt === "boolean"
-      ? choice.automaticallyReprompt
-      : typeof choice.autoReprompt === "boolean"
-      ? choice.autoReprompt
-      : false;
-
   return {
     id: typeof choice.id === "string" ? choice.id : fallbackId,
     label: typeof rawLabel === "string" ? rawLabel : `Choice ${index + 1}`,
     intent: typeof rawIntent === "string" ? rawIntent : undefined,
     buttonLabel: typeof rawButtonLabel === "string" ? rawButtonLabel : undefined,
-    automaticallyReprompt: reprompt,
   };
 };
 
@@ -191,7 +180,6 @@ const normalizeChoiceOptions = (choices: any[]): ChoiceOption[] => {
           : `Choice ${index + 1}`,
       intent: rawIntent.trim() || undefined,
       buttonLabel: rawButtonLabel.trim() || undefined,
-      automaticallyReprompt: !!ensured.automaticallyReprompt,
     };
   });
 };
@@ -209,7 +197,6 @@ const choicesEqual = (
     if ((a.label || "") !== (b.label || "")) return false;
     if ((a.intent || "") !== (b.intent || "")) return false;
     if ((a.buttonLabel || "") !== (b.buttonLabel || "")) return false;
-    if (!!a.automaticallyReprompt !== !!b.automaticallyReprompt) return false;
   }
   return true;
 };
@@ -218,12 +205,10 @@ const createDefaultChoiceList = (): ChoiceOption[] => [
   {
     id: generateChoiceId(),
     label: "Choice A",
-    automaticallyReprompt: false,
   },
   {
     id: generateChoiceId(),
     label: "Choice B",
-    automaticallyReprompt: false,
   },
 ];
 
@@ -4166,7 +4151,6 @@ export default function PropertiesPanel({
       const newChoice: ChoiceOption = {
         id: generateChoiceId(),
         label: `Choice ${choicesRef.current.length + 1}`,
-        automaticallyReprompt: false,
       };
       const next = [...choicesRef.current, newChoice];
       setChoicesState(next);
@@ -4201,7 +4185,6 @@ export default function PropertiesPanel({
         {
           intent: trimmedIntent || undefined,
           buttonLabel: trimmedButton.length > 0 ? trimmedButton : undefined,
-          automaticallyReprompt: !!draftChoice.automaticallyReprompt,
         },
         { persist: true }
       );
@@ -4233,14 +4216,9 @@ export default function PropertiesPanel({
               const isActive = activeChoiceId === choice.id;
               const effectiveChoice =
                 isActive && draftChoice ? draftChoice : choice;
-              const summaryIntent =
-                (effectiveChoice.intent || "").trim() || "None";
-              const summaryButton =
-                (effectiveChoice.buttonLabel || "").trim() ||
-                "Not configured";
-              const summaryReprompt = effectiveChoice.automaticallyReprompt
-                ? "On"
-                : "Off";
+              const summaryIntent = (effectiveChoice.intent || "").trim();
+              const summaryIntentDisplay =
+                summaryIntent.length > 0 ? summaryIntent : "Intent";
               return (
                 <div
                   key={choice.id}
@@ -4264,26 +4242,15 @@ export default function PropertiesPanel({
                       className={styles.choiceLabelInput}
                     />
                     <div className={styles.choiceSummary}>
-                      <div className={styles.choiceSummaryRow}>
-                        <span className={styles.choiceSummaryLabel}>Intent</span>
-                        <span className={styles.choiceSummaryValue}>
-                          {summaryIntent}
-                        </span>
-                      </div>
-                      <div className={styles.choiceSummaryRow}>
-                        <span className={styles.choiceSummaryLabel}>Button</span>
-                        <span className={styles.choiceSummaryValue}>
-                          {summaryButton}
-                        </span>
-                      </div>
-                      <div className={styles.choiceSummaryRow}>
-                        <span className={styles.choiceSummaryLabel}>
-                          Auto reprompt
-                        </span>
-                        <span className={styles.choiceSummaryValue}>
-                          {summaryReprompt}
-                        </span>
-                      </div>
+                      <span
+                        className={`${styles.choiceSummaryValue} ${
+                          summaryIntent.length === 0
+                            ? styles.choiceSummaryPlaceholder
+                            : ""
+                        }`}
+                      >
+                        {summaryIntentDisplay}
+                      </span>
                     </div>
                   </div>
                   <div className={styles.choiceItemActions}>
@@ -4326,39 +4293,24 @@ export default function PropertiesPanel({
                                 size="middle"
                               />
                             </Form.Item>
-                            <Form.Item label="Button label">
-                              <Input
-                                value={effectiveChoice.buttonLabel || ""}
-                                onChange={(event) => {
-                                  const nextValue = event.target.value;
+                          <Form.Item label="Button label">
+                            <Input
+                              value={effectiveChoice.buttonLabel || ""}
+                              onChange={(event) => {
+                                const nextValue = event.target.value;
                                   setDraftChoice((current) => {
                                     if (!current || current.id !== choice.id)
                                       return current;
-                                    return {
-                                      ...current,
-                                      buttonLabel: nextValue,
-                                    };
-                                  });
-                                }}
-                                placeholder="Optional button label"
-                              />
-                            </Form.Item>
-                            <Form.Item label="Automatically reprompt">
-                              <Switch
-                                checked={!!effectiveChoice.automaticallyReprompt}
-                                onChange={(checked) => {
-                                  setDraftChoice((current) => {
-                                    if (!current || current.id !== choice.id)
-                                      return current;
-                                    return {
-                                      ...current,
-                                      automaticallyReprompt: checked,
-                                    };
-                                  });
-                                }}
-                              />
-                            </Form.Item>
-                          </Form>
+                                  return {
+                                    ...current,
+                                    buttonLabel: nextValue,
+                                  };
+                                });
+                              }}
+                              placeholder="Optional button label"
+                            />
+                          </Form.Item>
+                        </Form>
                           <div className={styles.choicePopoverFooter}>
                             <Button onClick={closePopover}>Cancel</Button>
                             <Button type="primary" onClick={saveDraftChoice}>
