@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Handle, Position, NodeProps } from "reactflow";
-import { AppstoreOutlined, ArrowRightOutlined } from "@ant-design/icons";
+import { AppstoreOutlined } from "@ant-design/icons";
 import { useAppDispatch } from "../../../store/hooks";
 import { updateNode } from "../../../store/slices/workflowSlice";
 import NodeHeader from "./shared/NodeHeader";
@@ -19,6 +19,7 @@ interface ButtonsFallbackConfig {
   reprompts?: string[];
   inactivityTimeout?: number;
   followPath?: boolean;
+  pathLabel?: string;
 }
 
 interface ButtonsNodeData {
@@ -147,35 +148,35 @@ export default function ButtonsNode({
           {buttonsToRender.length === 0 ? (
             <div className={styles.node__empty}>No buttons configured yet</div>
           ) : (
-            buttonsToRender.map((button, index) => (
-              <div key={button.id || index} className={styles.node__buttonRow}>
-                <div className={styles.node__buttonContent}>
-                  <span className={styles.node__buttonLabel}>
-                    {button.label || `Button ${index + 1}`}
-                  </span>
+            buttonsToRender.map((button, index) => {
+              const label = button.label.trim();
+              return (
+                <div
+                  key={button.id || index}
+                  className={styles.node__buttonRow}
+                >
                   <span
-                    className={`${styles.node__matchTag} ${
-                      button.matchType === "any"
-                        ? styles.node__matchTagAny
-                        : styles.node__matchTagExact
+                    className={`${styles.node__buttonLabel} ${
+                      label ? "" : styles.node__buttonLabelPlaceholder
                     }`}
                   >
-                    {button.matchType === "any" ? "Match any" : "Match exact"}
+                    {label || "Add button label"}
                   </span>
+                  <div className={styles.node__buttonHandle}>
+                    <div
+                      className={`${styles.handle} ${styles["handle--button"]}`}
+                    >
+                      <Handle
+                        type="source"
+                        position={Position.Right}
+                        id={`button-${button.id}`}
+                        className={styles.handleInner}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <span className={styles.node__connector}>
-                  <ArrowRightOutlined />
-                </span>
-                <div className={styles.handleWrapper}>
-                  <Handle
-                    type="source"
-                    position={Position.Right}
-                    id={`button-${button.id}`}
-                    className={styles.handleInner}
-                  />
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
           {remainingButtons > 0 && (
             <div className={styles.node__more}>+{remainingButtons} more</div>

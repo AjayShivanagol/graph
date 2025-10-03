@@ -102,11 +102,31 @@ interface ButtonsNodeButton {
   matchType: ButtonMatchType;
 }
 
+const buttonsEqual = (
+  a: ButtonsNodeButton[],
+  b: ButtonsNodeButton[]
+) => {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    const btnA = a[i];
+    const btnB = b[i];
+    if (
+      btnA.id !== btnB.id ||
+      btnA.label !== btnB.label ||
+      btnA.matchType !== btnB.matchType
+    ) {
+      return false;
+    }
+  }
+  return true;
+};
+
 interface ButtonsFallbackConfig {
   enabled: boolean;
   reprompts: string[];
   inactivityTimeout?: number;
   followPath?: boolean;
+  pathLabel?: string;
 }
 
 const escapeHtml = (value: string) =>
@@ -139,6 +159,7 @@ const ensureFallbackReprompts = (
   return {
     ...config,
     reprompts,
+    pathLabel: typeof config.pathLabel === "string" ? config.pathLabel : "",
   };
 };
 
@@ -153,6 +174,9 @@ const fallbackConfigsEqual = (
     typeof b.inactivityTimeout === "number" ? b.inactivityTimeout : null;
   if (timeoutA !== timeoutB) return false;
   if (!!a.followPath !== !!b.followPath) return false;
+  const pathLabelA = `${a.pathLabel ?? ""}`.trim();
+  const pathLabelB = `${b.pathLabel ?? ""}`.trim();
+  if (pathLabelA !== pathLabelB) return false;
 
   const repromptsA = ensureFallbackReprompts(a).reprompts;
   const repromptsB = ensureFallbackReprompts(b).reprompts;
@@ -279,7 +303,7 @@ const actionsEqual = (
   });
 };
 
-const buttonsEqual = (
+const buttonsEqual1 = (
   left: CardButton | null,
   right: CardButton | null
 ): boolean => {
@@ -366,6 +390,12 @@ const normalizeFallbackConfig = (
       typeof fallback?.followPath === "boolean"
         ? fallback.followPath
         : defaults?.followPath,
+    pathLabel:
+      typeof fallback?.pathLabel === "string"
+        ? fallback.pathLabel
+        : typeof defaults?.pathLabel === "string"
+        ? defaults.pathLabel
+        : undefined,
   };
 };
 
@@ -3338,61 +3368,178 @@ export default function PropertiesPanel({
 
     const [buttonsState, setButtonsState] =
       useState<ButtonsNodeButton[]>(normalizedButtons);
-    const [selectedButtonId, setSelectedButtonId] = useState<string | null>(
-      normalizedButtons[0]?.id || null
-    );
+    const buttonsStateRef = useRef<ButtonsNodeButton[]>(normalizedButtons);
+    const normalizedButtonsRef = useRef<ButtonsNodeButton[]>(normalizedButtons);
+    const [activeButtonId, setActiveButtonId] = useState<string | null>(null);
+    const buttonLabelRefs = useRef<Record<string, ValueInputHandle | null>>({});
 
     useEffect(() => {
+      normalizedButtonsRef.current = normalizedButtons;
       setButtonsState(normalizedButtons);
-      setSelectedButtonId((prev) => {
-        if (!prev) return normalizedButtons[0]?.id || null;
-        return (
-          normalizedButtons.find((button) => button.id === prev)?.id ||
-          normalizedButtons[0]?.id ||
-          null
-        );
-      });
+      buttonsStateRef.current = normalizedButtons;
+      setActiveButtonId((prev) =>
+        prev && normalizedButtons.some((button) => button.id === prev)
+          ? prev
+          : null
+      );
     }, [normalizedButtons]);
 
-    const commitButtons = useCallback(
-      (nextButtons: ButtonsNodeButton[]) => {
-        setButtonsState(nextButtons);
-        handleUpdateNodeBatch({
-          buttons: nextButtons,
-          options: nextButtons.map((btn) => btn.label),
-        });
-      },
-      [handleUpdateNodeBatch]
-    );
+    useEffect(() => {
+      buttonsStateRef.current = buttonsState;
+    }, [buttonsState]);
 
-    const addButton = () => {
+    useEffect(() => {
+      if (!activeButtonId) return;
+      const focusLater = window.setTimeout(() => {
+        const ref = buttonLabelRefs.current[activeButtonId];
+        ref?.focus?.();
+      }, 0);
+      return () => window.clearTimeout(focusLater);
+    }, [activeButtonId]);
+
+    const persistButtons = (next?: ButtonsNodeButton[]) => {
+      const payload = next ?? buttonsStateRef.current;
+      if (buttonsEqual(payload, normalizedButtonsRef.current)) {
+        return;
+      }
+      handleUpdateNodeBatch({
+        buttons: payload,
+        options: payload.map((btn) => btn.label),
+      });
+    };
+
+    useEffect(() => {
+      return () => {
+        persistButtons();
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedNodeId]);
+
+    const updateButtonLocal = (
+      id: string,
+      patch: Partial<ButtonsNodeButton>,
+      options: { persist?: boolean } = {}
+    ) => {
+      setButtonsState((current) => {
+        const next = current.map((button) =>
+          button.id === id ? { ...button, ...patch } : button
+        );
+        buttonsStateRef.current = next;
+        if (options.persist) {
+          persistButtons(next);
+        }
+        return next;
+      });
+    };
+
+    const addButton = (afterId?: string) => {
+      if (buttonsStateRef.current.length >= 10) {
+        return;
+      }
+
       const newButton: ButtonsNodeButton = {
         id: generateButtonId(),
         label: "",
         matchType: "exact",
       };
-      const next = [...buttonsState, newButton];
-      commitButtons(next);
-      setSelectedButtonId(newButton.id);
+
+      const current = buttonsStateRef.current;
+      const trimmed = afterId
+        ? current.map((button) =>
+            button.id === afterId
+              ? { ...button, label: button.label.trim() }
+              : button
+          )
+        : current.slice();
+
+      const insertIndex = afterId
+        ? trimmed.findIndex((button) => button.id === afterId)
+        : -1;
+
+      const next =
+        afterId && insertIndex >= 0
+          ? [
+              ...trimmed.slice(0, insertIndex + 1),
+              newButton,
+              ...trimmed.slice(insertIndex + 1),
+            ]
+          : [...trimmed, newButton];
+
+      setButtonsState(next);
+      buttonsStateRef.current = next;
+      persistButtons(next);
+      setActiveButtonId(newButton.id);
     };
 
     const removeButton = (id: string) => {
-      const next = buttonsState.filter((button) => button.id !== id);
-      commitButtons(next);
-      if (selectedButtonId === id) {
-        setSelectedButtonId(next[0]?.id || null);
-      }
+      const next = buttonsStateRef.current.filter((button) => button.id !== id);
+      setButtonsState(next);
+      buttonsStateRef.current = next;
+      persistButtons(next);
+      setActiveButtonId((prev) => (prev === id ? null : prev));
+      delete buttonLabelRefs.current[id];
     };
 
-    const updateButton = (id: string, patch: Partial<ButtonsNodeButton>) => {
-      const next = buttonsState.map((button) =>
-        button.id === id ? { ...button, ...patch } : button
+    const handleButtonPopoverOpenChange =
+      (id: string) => (open: boolean) => {
+        setActiveButtonId((prev) => {
+          if (open) {
+            if (prev && prev !== id) {
+              persistButtons();
+            }
+            return id;
+          }
+          if (prev === id) {
+            persistButtons();
+            return null;
+          }
+          return prev;
+        });
+      };
+
+    const renderButtonEditor = (button: ButtonsNodeButton) => {
+      const canRenderAddAnother = buttonsStateRef.current.length < 10;
+      const isAddAnotherDisabled = button.label.trim().length === 0;
+
+      return (
+        <div className={styles.buttonsNodeEditor}>
+          <Typography.Text className={styles.buttonsNodeEditorTitle}>
+            Button
+          </Typography.Text>
+          <ValueInput
+            ref={(instance) => {
+              if (instance) {
+                buttonLabelRefs.current[button.id] = instance;
+              } else {
+                delete buttonLabelRefs.current[button.id];
+              }
+            }}
+            value={button.label}
+            onChange={(value) =>
+              updateButtonLocal(button.id, { label: value })
+            }
+            onBlur={() => persistButtons()}
+            onPressEnter={() => {
+              persistButtons();
+              setActiveButtonId(null);
+            }}
+            placeholder="Enter button label or {variable}"
+            size="large"
+          />
+          {canRenderAddAnother && (
+            <Button
+              block
+              type="default"
+              className={styles.buttonsNodeAddAnother}
+              disabled={isAddAnotherDisabled}
+              onClick={() => addButton(button.id)}
+            >
+              Add another
+            </Button>
+          )}
+        </div>
       );
-      commitButtons(next);
     };
-
-    const selectedButton =
-      buttonsState.find((button) => button.id === selectedButtonId) || null;
 
     const rawNoMatch = selectedNode.data.noMatch as
       | ButtonsFallbackConfig
@@ -3426,6 +3573,9 @@ export default function PropertiesPanel({
     );
     const [editingRepromptIndex, setEditingRepromptIndex] = useState<
       number | null
+    >(null);
+    const [pathLabelPopover, setPathLabelPopover] = useState<
+      "noMatch" | "noReply" | null
     >(null);
 
     useEffect(() => {
@@ -3467,6 +3617,12 @@ export default function PropertiesPanel({
     useEffect(() => {
       setFallbackPopover(null);
     }, [selectedNodeId]);
+
+    useEffect(() => {
+      if (!fallbackPopover) {
+        setPathLabelPopover(null);
+      }
+    }, [fallbackPopover]);
 
     const commitNoMatch = (next: ButtonsFallbackConfig) => {
       setNoMatchConfig(next);
@@ -3517,7 +3673,11 @@ export default function PropertiesPanel({
     const renderRepromptEditor = (
       draft: ButtonsFallbackConfig,
       setDraft: React.Dispatch<React.SetStateAction<ButtonsFallbackConfig>>,
-      options?: { showInactivity?: boolean }
+      options: {
+        showInactivity?: boolean;
+        followPathLabel?: string;
+        context: "noMatch" | "noReply";
+      }
     ) => {
       const safeDraft = ensureFallbackReprompts(draft);
 
@@ -3536,6 +3696,25 @@ export default function PropertiesPanel({
           ...current,
           reprompts: [...current.reprompts, ""],
         }));
+      };
+
+      const handleGenerateReprompts = (count: number) => {
+        if (!Number.isFinite(count) || count <= 0) return;
+        updateDraft((current) => {
+          const ensuredCurrent = ensureFallbackReprompts(current);
+          let nextReprompts = ensuredCurrent.reprompts.slice(0, count);
+          if (nextReprompts.length < count) {
+            nextReprompts = [
+              ...nextReprompts,
+              ...Array(count - nextReprompts.length).fill(""),
+            ];
+          }
+          return {
+            ...ensuredCurrent,
+            reprompts: nextReprompts,
+          };
+        });
+        setEditingRepromptIndex(count - 1);
       };
 
       const handleRemoveReprompt = (index: number) => {
@@ -3654,29 +3833,134 @@ export default function PropertiesPanel({
               );
             })}
           </div>
-          <Button
-            type="dashed"
-            icon={<PlusOutlined />}
-            onClick={handleAddReprompt}
-            className={styles.buttonsRepromptAdd}
-          >
-            Add reprompt
-          </Button>
-          {options?.showInactivity && (
-            <div className={styles.buttonsFallbackFieldRow}>
-              <span className={styles.buttonsFallbackFieldLabel}>
-                Follow path after reprompts?
-              </span>
-              <Switch
-                checked={!!safeDraft.followPath}
-                onChange={(checked) =>
-                  updateDraft((current) => ({
-                    ...current,
+          <div className={styles.buttonsRepromptActions}>
+            <Dropdown
+              trigger={["click"]}
+              overlayClassName={styles.buttonsRepromptGenerateMenu}
+              menu={{
+                items: [
+                  { key: "1", label: "Generate 1 variant" },
+                  { key: "3", label: "Generate 3 variants" },
+                  { key: "5", label: "Generate 5 variants" },
+                ],
+                onClick: ({ key }) => {
+                  const parsed = Number.parseInt(key, 10);
+                  handleGenerateReprompts(Number.isNaN(parsed) ? 0 : parsed);
+                },
+              }}
+            >
+              <Button className={styles.buttonsRepromptGenerate}>
+                <span className={styles.buttonsRepromptGenerateIcon}>✨</span>
+                Generate
+                <DownOutlined className={styles.buttonsRepromptGenerateCaret} />
+              </Button>
+            </Dropdown>
+            <Button
+              type="dashed"
+              icon={<PlusOutlined />}
+              onClick={handleAddReprompt}
+              className={styles.buttonsRepromptAdd}
+            >
+              Add reprompt
+            </Button>
+          </div>
+          <div className={styles.buttonsFollowPathRow}>
+            <span className={styles.buttonsFollowPathLabel}>
+              Follow path after reprompts?
+            </span>
+            <Switch
+              checked={!!safeDraft.followPath}
+              onChange={(checked) => {
+                updateDraft((current) => {
+                  const ensuredCurrent = ensureFallbackReprompts(current);
+                  return {
+                    ...ensuredCurrent,
                     followPath: checked,
-                  }))
-                }
-              />
-            </div>
+                    pathLabel: checked
+                      ? ensuredCurrent.pathLabel?.trim()
+                        ? ensuredCurrent.pathLabel
+                        : options.followPathLabel || ""
+                      : ensuredCurrent.pathLabel,
+                  };
+                });
+                setPathLabelPopover((current) => {
+                  if (checked) {
+                    return options.context;
+                  }
+                  return current === options.context ? null : current;
+                });
+              }}
+            />
+          </div>
+          {safeDraft.followPath && (
+            <Popover
+              trigger={["click"]}
+              destroyTooltipOnHide
+              placement="left"
+              overlayClassName={styles.buttonsPathLabelPopover}
+              open={pathLabelPopover === options.context}
+              onOpenChange={(open) => {
+                setPathLabelPopover((current) => {
+                  if (open) {
+                    return options.context;
+                  }
+                  return current === options.context ? null : current;
+                });
+              }}
+              content={
+                <div className={styles.buttonsPathLabelPopoverContent}>
+                  <Typography.Text className={styles.buttonsPathLabelPopoverTitle}>
+                    Path label
+                  </Typography.Text>
+                  <Input
+                    autoFocus
+                    value={safeDraft.pathLabel || ""}
+                    onChange={(event) => {
+                      const { value } = event.target;
+                      updateDraft((current) => ({
+                        ...ensureFallbackReprompts(current),
+                        pathLabel: value,
+                      }));
+                    }}
+                    placeholder={
+                      options.followPathLabel ||
+                      `Enter ${options.context === "noMatch" ? "no match" : "no reply"} label`
+                    }
+                    className={styles.buttonsPathLabelInput}
+                    onPressEnter={() =>
+                      setPathLabelPopover((current) =>
+                        current === options.context ? null : current
+                      )
+                    }
+                  />
+                  <Button
+                    type="primary"
+                    className={styles.buttonsPathLabelDone}
+                    onClick={() =>
+                      setPathLabelPopover((current) =>
+                        current === options.context ? null : current
+                      )
+                    }
+                  >
+                    Done
+                  </Button>
+                </div>
+              }
+            >
+              <button
+                type="button"
+                className={styles.buttonsPathLabelTrigger}
+              >
+                <span className={styles.buttonsPathLabelTriggerTitle}>
+                  Path label
+                </span>
+                <span className={styles.buttonsPathLabelTriggerValue}>
+                  {safeDraft.pathLabel?.trim() ||
+                    options.followPathLabel ||
+                    `Enter ${options.context === "noMatch" ? "no match" : "no reply"} label`}
+                </span>
+              </button>
+            </Popover>
           )}
         </div>
       );
@@ -3694,9 +3978,13 @@ export default function PropertiesPanel({
             } else {
               setDraftNoReply(ensureFallbackReprompts(noReplyConfig));
             }
+            setPathLabelPopover(null);
             return key;
           }
           commitDraftConfig(key);
+          setPathLabelPopover((current) =>
+            current === key ? null : current
+          );
           return prev === key ? null : prev;
         });
       };
@@ -3741,7 +4029,7 @@ export default function PropertiesPanel({
           <Button
             icon={<PlusOutlined />}
             type="text"
-            onClick={addButton}
+            onClick={() => addButton()}
             disabled={buttonsState.length >= 10}
             className={styles.buttonsNodeAdd}
           />
@@ -3754,64 +4042,44 @@ export default function PropertiesPanel({
             </Typography.Text>
           )}
           {buttonsState.map((button) => {
-            const isActive = selectedButtonId === button.id;
-            const displayLabel = button.label.trim() || "New button (inactive)";
+            const isActive = activeButtonId === button.id;
+            const displayLabel = button.label.trim() || "Add button label";
             return (
-              <div
+              <Popover
                 key={button.id}
-                className={`${styles.buttonsNodeListItem} ${
-                  isActive ? styles.buttonsNodeListItemActive : ""
-                } ${
-                  button.label.trim() ? "" : styles.buttonsNodeListItemInactive
-                }`}
-                onClick={() => setSelectedButtonId(button.id)}
+                trigger={["click"]}
+                destroyTooltipOnHide
+                placement="left"
+                overlayClassName={styles.buttonsNodePopover}
+                open={isActive}
+                onOpenChange={handleButtonPopoverOpenChange(button.id)}
+                content={renderButtonEditor(button)}
               >
-                <span className={styles.buttonsNodeListLabel}>
-                  {displayLabel}
-                </span>
-                <Button
-                  type="text"
-                  icon={<MinusOutlined />}
-                  className={styles.buttonsNodeListRemove}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    removeButton(button.id);
-                  }}
-                />
-              </div>
+                <div
+                  className={`${styles.buttonsNodeListItem} ${
+                    isActive ? styles.buttonsNodeListItemActive : ""
+                  } ${
+                    button.label.trim() ? "" : styles.buttonsNodeListItemInactive
+                  }`}
+                >
+                  <span className={styles.buttonsNodeListLabel}>
+                    {displayLabel}
+                  </span>
+                  <Button
+                    type="text"
+                    icon={<MinusOutlined />}
+                    className={styles.buttonsNodeListRemove}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      removeButton(button.id);
+                    }}
+                    onMouseDown={(event) => event.stopPropagation()}
+                  />
+                </div>
+              </Popover>
             );
           })}
         </div>
-
-        {selectedButton && (
-          <div className={styles.buttonsNodeEditor}>
-            <Typography.Text className={styles.buttonsNodeEditorTitle}>
-              Button
-            </Typography.Text>
-            <ValueInput
-              value={selectedButton.label}
-              onChange={(value) =>
-                updateButton(selectedButton.id, { label: value })
-              }
-              placeholder="Enter button label or {variable}"
-              size="large"
-            />
-            <div className={styles.buttonsNodeMatchRow}>
-              <span className={styles.buttonsNodeMatchLabel}>Match type</span>
-              <Select
-                value={selectedButton.matchType}
-                onChange={(value: ButtonMatchType) =>
-                  updateButton(selectedButton.id, { matchType: value })
-                }
-                options={[
-                  { value: "exact", label: "Match exact" },
-                  { value: "any", label: "Match any" },
-                ]}
-                className={styles.buttonsNodeMatchSelect}
-              />
-            </div>
-          </div>
-        )}
 
         <Divider className={styles.buttonsNodeDivider} />
 
@@ -3826,7 +4094,10 @@ export default function PropertiesPanel({
             overlayClassName={styles.buttonsFallbackPopover}
             open={fallbackPopover === "noMatch"}
             onOpenChange={handleFallbackOpenChange("noMatch")}
-            content={renderRepromptEditor(draftNoMatch, setDraftNoMatch)}
+            content={renderRepromptEditor(draftNoMatch, setDraftNoMatch, {
+              context: "noMatch",
+              followPathLabel: "No match",
+            })}
           >
             <div
               className={`${styles.buttonsFallbackItem} ${
@@ -3862,6 +4133,8 @@ export default function PropertiesPanel({
             onOpenChange={handleFallbackOpenChange("noReply")}
             content={renderRepromptEditor(draftNoReply, setDraftNoReply, {
               showInactivity: true,
+              context: "noReply",
+              followPathLabel: "No reply",
             })}
           >
             <div

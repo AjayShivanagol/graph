@@ -1,21 +1,11 @@
+@use "./variables" as *;
+
 .node {
-  position: relative;
-  width: 240px;
+  @extend %node-base;
   background: #ffffff;
-  border: 1px solid #e2e8f0;
   border-radius: 12px;
+  border: 1px solid #e2e8f0;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
-  overflow: visible;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
-  font-family:
-    "Inter",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    sans-serif;
 
   &.selected {
     border-color: #14b8a6;
@@ -43,7 +33,7 @@
 .node__buttonList {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .node__empty {
@@ -63,17 +53,19 @@
   gap: 12px;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  background: #f8fafc;
-  padding: 12px;
-  padding-right: 48px;
+  background: #ffffff;
+  padding: 8px 14px;
+  padding-right: 24px;
+  min-height: 36px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  overflow: visible;
 }
 
-.node__buttonContent {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
+.node__buttonHandle {
+  position: absolute;
+  top: 50%;
+  right: -12px;
+  transform: translateY(-50%);
 }
 
 .node__buttonLabel {
@@ -83,72 +75,13 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
 }
 
-.node__matchTag {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  border-radius: 999px;
-  padding: 2px 10px;
-}
-
-.node__matchTagExact {
-  background: #e0f2fe;
-  color: #0369a1;
-  border: 1px solid #bae6fd;
-}
-
-.node__matchTagAny {
-  background: #fce7f3;
-  color: #9d174d;
-  border: 1px solid #fbcfe8;
-}
-
-.node__connector {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 999px;
-  background: #e2e8f0;
-  color: #475569;
-  font-size: 12px;
-  flex-shrink: 0;
-  margin-left: auto;
-}
-
-.handleWrapper {
-  position: absolute;
-  top: 50%;
-  right: -12px;
-  transform: translateY(-50%);
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  background: #ecfdf5;
-  border: 1px solid #bbf7d0;
-  box-shadow: 0 1px 2px rgba(16, 185, 129, 0.18);
-  flex-shrink: 0;
-}
-
-.handleWrapper::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  background: #10b981;
-  border: 2px solid #ffffff;
-  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.25);
+.node__buttonLabelPlaceholder {
+  color: #94a3b8;
+  font-weight: 500;
+  font-style: italic;
 }
 
 .node__more {
@@ -180,34 +113,28 @@
 
 .handle {
   position: absolute;
-  top: -6px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  background: #14b8a6;
-  box-shadow:
-    0 0 0 2px #ffffff,
-    0 4px 8px rgba(20, 184, 166, 0.3);
-}
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+  background: #ec4899;
+  pointer-events: auto;
 
-.handle::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  background: #0f766e;
-  border: 2px solid #ffffff;
-  box-shadow: 0 0 0 1px rgba(15, 118, 110, 0.25);
+  &--top {
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  &--button {
+    background: #52c41a;
+  }
 }
 
 .handleInner {
+  opacity: 0;
   width: 100%;
   height: 100%;
-  opacity: 0;
 }
