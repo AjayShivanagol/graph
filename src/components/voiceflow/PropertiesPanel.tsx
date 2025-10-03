@@ -124,7 +124,7 @@ const ensureChoiceOption = (choice: any, index: number): ChoiceOption => {
   if (!choice) {
     return {
       id: fallbackId,
-      label: `Choice ${index + 1}`,
+      label: "",
     };
   }
 
@@ -155,7 +155,7 @@ const ensureChoiceOption = (choice: any, index: number): ChoiceOption => {
       : undefined;
   return {
     id: typeof choice.id === "string" ? choice.id : fallbackId,
-    label: typeof rawLabel === "string" ? rawLabel : `Choice ${index + 1}`,
+    label: typeof rawLabel === "string" ? rawLabel : "",
     intent: typeof rawIntent === "string" ? rawIntent : undefined,
     buttonLabel: typeof rawButtonLabel === "string" ? rawButtonLabel : undefined,
   };
@@ -172,12 +172,7 @@ const normalizeChoiceOptions = (choices: any[]): ChoiceOption[] => {
       typeof ensured.buttonLabel === "string" ? ensured.buttonLabel : "";
     return {
       id: ensured.id,
-      label:
-        trimmedLabel.length > 0
-          ? trimmedLabel
-          : rawLabel.length > 0
-          ? rawLabel
-          : `Choice ${index + 1}`,
+      label: trimmedLabel.length > 0 ? trimmedLabel : "",
       intent: rawIntent.trim() || undefined,
       buttonLabel: rawButtonLabel.trim() || undefined,
     };
@@ -204,11 +199,11 @@ const choicesEqual = (
 const createDefaultChoiceList = (): ChoiceOption[] => [
   {
     id: generateChoiceId(),
-    label: "Choice A",
+    label: "",
   },
   {
     id: generateChoiceId(),
-    label: "Choice B",
+    label: "",
   },
 ];
 
@@ -4150,7 +4145,7 @@ export default function PropertiesPanel({
     const addChoice = () => {
       const newChoice: ChoiceOption = {
         id: generateChoiceId(),
-        label: `Choice ${choicesRef.current.length + 1}`,
+        label: "",
       };
       const next = [...choicesRef.current, newChoice];
       setChoicesState(next);
@@ -4178,11 +4173,13 @@ export default function PropertiesPanel({
 
     const saveDraftChoice = () => {
       if (!draftChoice) return;
+      const trimmedLabel = (draftChoice.label || "").trim();
       const trimmedIntent = (draftChoice.intent || "").trim();
       const trimmedButton = (draftChoice.buttonLabel || "").trim();
       updateChoice(
         draftChoice.id,
         {
+          label: trimmedLabel,
           intent: trimmedIntent || undefined,
           buttonLabel: trimmedButton.length > 0 ? trimmedButton : undefined,
         },
@@ -4217,8 +4214,15 @@ export default function PropertiesPanel({
               const effectiveChoice =
                 isActive && draftChoice ? draftChoice : choice;
               const summaryIntent = (effectiveChoice.intent || "").trim();
-              const summaryIntentDisplay =
-                summaryIntent.length > 0 ? summaryIntent : "Intent";
+              const summaryLabel = (effectiveChoice.label || "").trim();
+              const summaryDisplay =
+                summaryLabel.length > 0
+                  ? summaryLabel
+                  : summaryIntent.length > 0
+                  ? summaryIntent
+                  : "Intent";
+              const isPlaceholder =
+                summaryLabel.length === 0 && summaryIntent.length === 0;
               return (
                 <div
                   key={choice.id}
@@ -4226,81 +4230,70 @@ export default function PropertiesPanel({
                     isActive ? styles.choiceListItemActive : ""
                   }`}
                 >
-                  <div className={styles.choiceListContent}>
-                    <ValueInput
-                      value={choice.label}
-                      onChange={(value) =>
-                        updateChoice(choice.id, { label: value })
+                  <Popover
+                    trigger="click"
+                    open={isActive}
+                    onOpenChange={(open) => {
+                      if (open) {
+                        setActiveChoiceId(choice.id);
+                        setDraftChoice({ ...choice });
+                      } else {
+                        closePopover();
                       }
-                      onBlur={() => persistChoices()}
-                      onPressEnter={() => {
-                        persistChoices();
-                        setActiveChoiceId(null);
-                      }}
-                      placeholder="Enter choice label or {variable}"
-                      size="middle"
-                      className={styles.choiceLabelInput}
-                    />
-                    <div className={styles.choiceSummary}>
-                      <span
-                        className={`${styles.choiceSummaryValue} ${
-                          summaryIntent.length === 0
-                            ? styles.choiceSummaryPlaceholder
-                            : ""
-                        }`}
-                      >
-                        {summaryIntentDisplay}
-                      </span>
-                    </div>
-                  </div>
-                  <div className={styles.choiceItemActions}>
-                    <Popover
-                      trigger="click"
-                      open={isActive}
-                      onOpenChange={(open) => {
-                        if (open) {
-                          setActiveChoiceId(choice.id);
-                          setDraftChoice({ ...choice });
-                        } else {
-                          closePopover();
-                        }
-                      }}
-                      placement="right"
-                      overlayClassName={styles.choicePopoverOverlay}
-                      content={
-                        <div className={styles.choicePopover}>
-                          <Typography.Text className={styles.choicePopoverTitle}>
-                            Choice settings
-                          </Typography.Text>
-                          <Form layout="vertical">
-                            <Form.Item label="Intent">
-                              <IntentPicker
-                                value={effectiveChoice.intent || ""}
-                                onChange={(nextIntent) => {
-                                  setDraftChoice((current) => {
-                                    if (!current || current.id !== choice.id)
-                                      return current;
-                                    return {
-                                      ...current,
-                                      intent: nextIntent,
-                                    };
-                                  });
-                                }}
-                                placeholder="Select or create intent"
-                                allowCreate
-                                allowClear
-                                createMode="modal"
-                                size="middle"
-                              />
-                            </Form.Item>
+                    }}
+                    placement="right"
+                    overlayClassName={styles.choicePopoverOverlay}
+                    content={
+                      <div className={styles.choicePopover}>
+                        <Typography.Text className={styles.choicePopoverTitle}>
+                          Choice settings
+                        </Typography.Text>
+                        <Form layout="vertical">
+                          <Form.Item label="Label">
+                            <Input
+                              value={effectiveChoice.label || ""}
+                              onChange={(event) => {
+                                const nextValue = event.target.value;
+                                setDraftChoice((current) => {
+                                  if (!current || current.id !== choice.id)
+                                    return current;
+                                  return {
+                                    ...current,
+                                    label: nextValue,
+                                  };
+                                });
+                              }}
+                              placeholder="Optional label"
+                            />
+                          </Form.Item>
+                          <Form.Item label="Intent">
+                            <IntentPicker
+                              value={effectiveChoice.intent || ""}
+                              onChange={(nextIntent) => {
+                                setDraftChoice((current) => {
+                                  if (!current || current.id !== choice.id)
+                                    return current;
+                                  return {
+                                    ...current,
+                                    intent: nextIntent,
+                                  };
+                                });
+                              }}
+                              placeholder="Select or create intent"
+                              allowCreate
+                              allowClear
+                              createMode="modal"
+                              size="middle"
+                            />
+                          </Form.Item>
                           <Form.Item label="Button label">
                             <Input
                               value={effectiveChoice.buttonLabel || ""}
                               onChange={(event) => {
                                 const nextValue = event.target.value;
-                                  setDraftChoice((current) => {
-                                    if (!current || current.id !== choice.id)
-                                      return current;
+                                setDraftChoice((current) => {
+                                  if (!current || current.id !== choice.id)
+                                    return current;
                                   return {
                                     ...current,
                                     buttonLabel: nextValue,
@@ -4311,23 +4304,29 @@ export default function PropertiesPanel({
                             />
                           </Form.Item>
                         </Form>
-                          <div className={styles.choicePopoverFooter}>
-                            <Button onClick={closePopover}>Cancel</Button>
-                            <Button type="primary" onClick={saveDraftChoice}>
-                              Save
-                            </Button>
-                          </div>
+                        <div className={styles.choicePopoverFooter}>
+                          <Button onClick={closePopover}>Cancel</Button>
+                          <Button type="primary" onClick={saveDraftChoice}>
+                            Save
+                          </Button>
                         </div>
-                      }
+                      </div>
+                    }
+                  >
+                    <button
+                      type="button"
+                      className={styles.choiceListTrigger}
                     >
-                      <Button
-                        type="link"
-                        size="small"
-                        className={styles.choiceConfigureButton}
+                      <span
+                        className={`${styles.choiceListTriggerText} ${
+                          isPlaceholder ? styles.choiceListTriggerPlaceholder : ""
+                        }`}
                       >
-                        Configure
-                      </Button>
-                    </Popover>
+                        {summaryDisplay}
+                      </span>
+                    </button>
+                  </Popover>
+                  <div className={styles.choiceItemActions}>
                     <Button
                       type="text"
                       icon={<MinusOutlined />}

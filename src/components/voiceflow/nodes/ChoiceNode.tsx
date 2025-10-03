@@ -12,16 +12,24 @@ export default function ChoiceNode({ id, data, selected }: NodeProps<any>) {
   const [label, setLabel] = useState<string>(data.label || '');
 
   const normalizedChoices = useMemo(() => {
+    const fallback = [
+      { id: 'choice-0', label: 'Trigger' },
+      { id: 'choice-1', label: 'Trigger' },
+    ];
+
     if (!Array.isArray(data.choices)) {
-      return [
-        { id: 'choice-0', label: 'Choice A' },
-        { id: 'choice-1', label: 'Choice B' },
-      ];
+      return fallback;
     }
+
     const mapped = data.choices.map((choice: any, index: number) => {
       if (typeof choice === 'string') {
-        return { id: `choice-${index}`, label: choice };
+        const trimmed = choice.trim();
+        return {
+          id: `choice-${index}`,
+          label: trimmed.length > 0 ? trimmed : 'Trigger',
+        };
       }
+
       if (choice && typeof choice === 'object') {
         const choiceId =
           typeof choice.id === 'string' ? choice.id : `choice-${index}`;
@@ -31,20 +39,28 @@ export default function ChoiceNode({ id, data, selected }: NodeProps<any>) {
             : typeof choice.text === 'string'
             ? choice.text
             : '';
+        const rawIntent =
+          typeof choice.intent === 'string'
+            ? choice.intent
+            : typeof choice.intentName === 'string'
+            ? choice.intentName
+            : '';
         const trimmedLabel = (rawLabel || '').trim();
+        const trimmedIntent = (rawIntent || '').trim();
+        const display = trimmedLabel || trimmedIntent;
         return {
           id: choiceId,
-          label: trimmedLabel || rawLabel || `Choice ${index + 1}`,
+          label: display.length > 0 ? display : 'Trigger',
         };
       }
-      return { id: `choice-${index}`, label: `Choice ${index + 1}` };
+
+      return { id: `choice-${index}`, label: 'Trigger' };
     });
+
     if (mapped.length === 0) {
-      return [
-        { id: 'choice-0', label: 'Choice A' },
-        { id: 'choice-1', label: 'Choice B' },
-      ];
+      return fallback;
     }
+
     return mapped;
   }, [data.choices]);
 
@@ -95,15 +111,15 @@ export default function ChoiceNode({ id, data, selected }: NodeProps<any>) {
             {data.question}
           </div>
         )}
-        <div>
-          {normalizedChoices.slice(0, 3).map((choice, index: number) => (
-            <div key={index} className={styles.choiceItem}>
-              <div className={styles.choiceDot}></div>
-              <div className={styles.choiceText}>
-                {choice.label || `Choice ${index + 1}`}
+          <div>
+            {normalizedChoices.slice(0, 3).map((choice, index: number) => (
+              <div key={index} className={styles.choiceItem}>
+                <div className={styles.choiceDot}></div>
+                <div className={styles.choiceText}>
+                  {choice.label || 'Trigger'}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
           {normalizedChoices.length > 3 && (
             <div className={styles.moreChoices}>
               +{normalizedChoices.length - 3} more choices
