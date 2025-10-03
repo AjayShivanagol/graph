@@ -303,7 +303,7 @@ const actionsEqual = (
   });
 };
 
-const buttonsEqual = (
+const buttonsEqual1 = (
   left: CardButton | null,
   right: CardButton | null
 ): boolean => {

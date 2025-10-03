@@ -151,7 +151,10 @@ export default function ButtonsNode({
             buttonsToRender.map((button, index) => {
               const label = button.label.trim();
               return (
-                <div key={button.id || index} className={styles.node__buttonRow}>
+                <div
+                  key={button.id || index}
+                  className={styles.node__buttonRow}
+                >
                   <span
                     className={`${styles.node__buttonLabel} ${
                       label ? "" : styles.node__buttonLabelPlaceholder
@@ -159,15 +162,17 @@ export default function ButtonsNode({
                   >
                     {label || "Add button label"}
                   </span>
-                  <div
-                    className={`${styles.handle} ${styles["handle--button"]}`}
-                  >
-                    <Handle
-                      type="source"
-                      position={Position.Right}
-                      id={`button-${button.id}`}
-                      className={styles.handleInner}
-                    />
+                  <div className={styles.node__buttonHandle}>
+                    <div
+                      className={`${styles.handle} ${styles["handle--button"]}`}
+                    >
+                      <Handle
+                        type="source"
+                        position={Position.Right}
+                        id={`button-${button.id}`}
+                        className={styles.handleInner}
+                      />
+                    </div>
                   </div>
                 </div>
               );
