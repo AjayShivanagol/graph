@@ -2183,3 +2183,141 @@
   gap: 8px;
   margin-top: 8px;
 }
+
+// Capture Properties Styles
+.captureModeGroup {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.captureSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.captureEntitiesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.captureEntitiesList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.captureEntityRow {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.captureEntityColumn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.captureEntityActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 32px;
+}
+
+.captureRemoveButton {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ef4444;
+  background: #fff5f5;
+
+  &:hover {
+    border-color: #fecaca;
+    background: #fee2e2;
+  }
+}
+
+.captureEntityMeta {
+  display: flex;
+  gap: 8px;
+}
+
+.captureEmptyState {
+  padding: 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #64748b;
+  font-size: 13px;
+  text-align: center;
+}
+
+.captureToggleCard {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.captureToggleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.captureToggleDescription {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.captureInlineInputs {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.captureList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.captureListItem {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fafc;
+  display: flex;
+  gap: 12px;
+}
+
+.captureListTextarea {
+  flex: 1;
+}
+
+.captureListActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.captureAddRowButton {
+  align-self: flex-start;
+}

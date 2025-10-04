@@ -51,6 +51,7 @@ import type { MenuProps } from "antd";
 import Editor from "@monaco-editor/react";
 import VariablePicker from "../common/VariablePicker";
 import IntentPicker from "../common/IntentPicker";
+import EntityPicker from "../common/EntityPicker";
 import PromptPicker from "../common/PromptPicker";
 import PromptEditor from "../common/PromptEditor";
 import ValueInput, { ValueInputHandle } from "../common/ValueInput";
@@ -109,6 +110,128 @@ interface ChoiceOption {
   intent?: string;
   buttonLabel?: string;
 }
+
+type CaptureMode = "entities" | "reply";
+
+interface CaptureEntityConfig {
+  id: string;
+  entity: string;
+  variable: string;
+  required: boolean;
+}
+
+interface CaptureNoReplyConfig {
+  enabled: boolean;
+  timeout: number;
+  prompt: string;
+}
+
+interface CaptureAutoRepromptConfig {
+  enabled: boolean;
+  temperature: number;
+  maxTokens: number;
+  systemPrompt: string;
+}
+
+const generateCaptureEntityId = () =>
+  `capture-entity-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}`;
+
+const ensureCaptureEntity = (
+  entry: any,
+  index: number
+): CaptureEntityConfig => {
+  const fallbackId = `capture-entity-${index}`;
+  if (!entry || typeof entry !== "object") {
+    return {
+      id: fallbackId,
+      entity: "",
+      variable: "",
+      required: true,
+    };
+  }
+
+  const rawEntity =
+    typeof entry.entity === "string"
+      ? entry.entity
+      : typeof entry.name === "string"
+      ? entry.name
+      : "";
+  const rawVariable =
+    typeof entry.variable === "string"
+      ? entry.variable
+      : typeof entry.slot === "string"
+      ? entry.slot
+      : "";
+
+  return {
+    id: typeof entry.id === "string" ? entry.id : fallbackId,
+    entity: rawEntity.trim(),
+    variable: rawVariable.trim(),
+    required: entry.required === false ? false : true,
+  };
+};
+
+const normalizeCaptureEntities = (input: any): CaptureEntityConfig[] => {
+  if (!Array.isArray(input)) return [];
+  return input.map((entry, index) => ensureCaptureEntity(entry, index));
+};
+
+const ensureNoReplyConfig = (input: any): CaptureNoReplyConfig => {
+  const timeout = Number.isFinite(input?.timeout) ? Number(input.timeout) : 10;
+  return {
+    enabled: !!input?.enabled,
+    timeout: timeout > 0 ? timeout : 10,
+    prompt: typeof input?.prompt === "string" ? input.prompt : "",
+  };
+};
+
+const ensureAutoRepromptConfig = (input: any): CaptureAutoRepromptConfig => {
+  const temperature = Number.isFinite(input?.temperature)
+    ? Number(input.temperature)
+    : 0.7;
+  const maxTokens = Number.isFinite(input?.maxTokens)
+    ? Number(input.maxTokens)
+    : 256;
+
+  return {
+    enabled: !!input?.enabled,
+    temperature: Math.min(Math.max(temperature, 0), 2),
+    maxTokens: Math.max(Math.floor(maxTokens), 1),
+    systemPrompt:
+      typeof input?.systemPrompt === "string" ? input.systemPrompt : "",
+  };
+};
+
+const serializeCaptureEntities = (
+  entries: CaptureEntityConfig[]
+): CaptureEntityConfig[] =>
+  entries.map((entry, index) => ({
+    id: entry.id || `capture-entity-${index}`,
+    entity: entry.entity.trim(),
+    variable: entry.variable.trim(),
+    required: entry.required !== false,
+  }));
+
+const serializeNoReplyConfig = (config: CaptureNoReplyConfig) => ({
+  enabled: !!config.enabled,
+  timeout: Math.max(Math.floor(config.timeout) || 1, 1),
+  prompt: config.prompt,
+});
+
+const serializeAutoRepromptConfig = (config: CaptureAutoRepromptConfig) => ({
+  enabled: !!config.enabled,
+  temperature: Number(config.temperature.toFixed(2)),
+  maxTokens: Math.max(Math.floor(config.maxTokens) || 1, 1),
+  systemPrompt: config.systemPrompt,
+});
+
+const normalizeStringList = (value: any): string[] => {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => `${entry ?? ""}`);
+};
+
+const serializeStringList = (values: string[]) =>
+  values.map((entry) => `${entry ?? ""}`.trim());
 
 interface FallbackSettingsProps {
   selectedNode: any;
@@ -2530,6 +2653,552 @@ export default function PropertiesPanel({
     </Form>
   );
 
+  const CaptureProperties = () => {
+    const [captureMode, setCaptureMode] = useState<CaptureMode>(
+      selectedNode.data.captureMode === "reply" ? "reply" : "entities"
+    );
+    const [entityRows, setEntityRows] = useState<CaptureEntityConfig[]>(
+      normalizeCaptureEntities(selectedNode.data.entities)
+    );
+    const [promptValue, setPromptValue] = useState<string>(
+      selectedNode.data.prompt || ""
+    );
+    const [validationValue, setValidationValue] = useState<string>(
+      selectedNode.data.validation || ""
+    );
+    const [replyVariable, setReplyVariable] = useState<string>(
+      selectedNode.data.variable || ""
+    );
+    const [listenForOtherTriggersState, setListenForOtherTriggersState] =
+      useState<boolean>(!!selectedNode.data.listenForOtherTriggers);
+    const [noReplyState, setNoReplyState] = useState<CaptureNoReplyConfig>(
+      ensureNoReplyConfig(selectedNode.data.noReply)
+    );
+    const [autoRepromptState, setAutoRepromptState] =
+      useState<CaptureAutoRepromptConfig>(
+        ensureAutoRepromptConfig(selectedNode.data.autoReprompt)
+      );
+    const [rules, setRules] = useState<string[]>(
+      normalizeStringList(selectedNode.data.rules)
+    );
+    const [exitScenarios, setExitScenarios] = useState<string[]>(
+      normalizeStringList(selectedNode.data.exitScenarios)
+    );
+    const [exitPathEnabled, setExitPathEnabled] = useState<boolean>(
+      !!selectedNode.data.exitPathEnabled
+    );
+
+    useEffect(() => {
+      setCaptureMode(
+        selectedNode.data.captureMode === "reply" ? "reply" : "entities"
+      );
+      setEntityRows(normalizeCaptureEntities(selectedNode.data.entities));
+      setPromptValue(selectedNode.data.prompt || "");
+      setValidationValue(selectedNode.data.validation || "");
+      setReplyVariable(selectedNode.data.variable || "");
+      setListenForOtherTriggersState(
+        !!selectedNode.data.listenForOtherTriggers
+      );
+      setNoReplyState(ensureNoReplyConfig(selectedNode.data.noReply));
+      setAutoRepromptState(
+        ensureAutoRepromptConfig(selectedNode.data.autoReprompt)
+      );
+      setRules(normalizeStringList(selectedNode.data.rules));
+      setExitScenarios(normalizeStringList(selectedNode.data.exitScenarios));
+      setExitPathEnabled(!!selectedNode.data.exitPathEnabled);
+    }, [
+      selectedNodeId,
+      selectedNode.data.captureMode,
+      selectedNode.data.entities,
+      selectedNode.data.prompt,
+      selectedNode.data.validation,
+      selectedNode.data.variable,
+      selectedNode.data.listenForOtherTriggers,
+      selectedNode.data.noReply,
+      selectedNode.data.autoReprompt,
+      selectedNode.data.rules,
+      selectedNode.data.exitScenarios,
+      selectedNode.data.exitPathEnabled,
+    ]);
+
+    const commitPrompt = () => {
+      handleUpdateNode("prompt", promptValue);
+    };
+
+    const commitValidation = () => {
+      handleUpdateNode("validation", validationValue);
+    };
+
+    const updateEntities = (
+      producer: (current: CaptureEntityConfig[]) => CaptureEntityConfig[]
+    ) => {
+      setEntityRows((current) => {
+        const next = producer(current);
+        handleUpdateNodeBatch({
+          entities: serializeCaptureEntities(next),
+        });
+        return next;
+      });
+    };
+
+    const addEntityRow = () => {
+      updateEntities((current) => [
+        ...current,
+        {
+          id: generateCaptureEntityId(),
+          entity: "",
+          variable: "",
+          required: true,
+        },
+      ]);
+    };
+
+    const removeEntityRow = (rowId: string) => {
+      updateEntities((current) => current.filter((row) => row.id !== rowId));
+    };
+
+    const setEntityRowValue = (
+      rowId: string,
+      patch: Partial<CaptureEntityConfig>
+    ) => {
+      updateEntities((current) =>
+        current.map((row) =>
+          row.id === rowId
+            ? {
+                ...row,
+                ...patch,
+                entity: patch.entity !== undefined ? patch.entity : row.entity,
+                variable:
+                  patch.variable !== undefined ? patch.variable : row.variable,
+                required:
+                  patch.required !== undefined ? patch.required : row.required,
+              }
+            : row
+        )
+      );
+    };
+
+    const commitCaptureMode = (nextMode: CaptureMode) => {
+      setCaptureMode(nextMode);
+      if (nextMode === "reply") {
+        const normalized = replyVariable.trim() || "user_input";
+        setReplyVariable(normalized);
+        handleUpdateNodeBatch({ captureMode: nextMode, variable: normalized });
+      } else {
+        handleUpdateNodeBatch({ captureMode: nextMode });
+      }
+    };
+
+    const toggleListenForOtherTriggers = (checked: boolean) => {
+      setListenForOtherTriggersState(checked);
+      handleUpdateNodeBatch({ listenForOtherTriggers: checked });
+    };
+
+    const updateNoReply = (patch: Partial<CaptureNoReplyConfig>) => {
+      setNoReplyState((current) => {
+        const next = { ...current, ...patch };
+        handleUpdateNodeBatch({ noReply: serializeNoReplyConfig(next) });
+        return next;
+      });
+    };
+
+    const updateAutoReprompt = (
+      patch: Partial<CaptureAutoRepromptConfig>
+    ) => {
+      setAutoRepromptState((current) => {
+        const next = { ...current, ...patch };
+        handleUpdateNodeBatch({
+          autoReprompt: serializeAutoRepromptConfig(next),
+        });
+        return next;
+      });
+    };
+
+    const addRule = () => {
+      setRules((current) => {
+        const next = [...current, ""];
+        handleUpdateNodeBatch({ rules: serializeStringList(next) });
+        return next;
+      });
+    };
+
+    const updateRule = (index: number, value: string) => {
+      setRules((current) => {
+        const next = [...current];
+        next[index] = value;
+        handleUpdateNodeBatch({ rules: serializeStringList(next) });
+        return next;
+      });
+    };
+
+    const removeRule = (index: number) => {
+      setRules((current) => {
+        const next = current.filter((_, idx) => idx !== index);
+        handleUpdateNodeBatch({ rules: serializeStringList(next) });
+        return next;
+      });
+    };
+
+    const addExitScenario = () => {
+      setExitScenarios((current) => {
+        const next = [...current, ""];
+        handleUpdateNodeBatch({ exitScenarios: serializeStringList(next) });
+        return next;
+      });
+    };
+
+    const updateExitScenario = (index: number, value: string) => {
+      setExitScenarios((current) => {
+        const next = [...current];
+        next[index] = value;
+        handleUpdateNodeBatch({ exitScenarios: serializeStringList(next) });
+        return next;
+      });
+    };
+
+    const removeExitScenario = (index: number) => {
+      setExitScenarios((current) => {
+        const next = current.filter((_, idx) => idx !== index);
+        handleUpdateNodeBatch({ exitScenarios: serializeStringList(next) });
+        return next;
+      });
+    };
+
+    const toggleExitPath = (checked: boolean) => {
+      setExitPathEnabled(checked);
+      handleUpdateNodeBatch({ exitPathEnabled: checked });
+    };
+
+    return (
+      <Form layout="vertical">
+        <Form.Item label="Capture mode">
+          <Radio.Group
+            value={captureMode}
+            onChange={(event) =>
+              commitCaptureMode(event.target.value as CaptureMode)
+            }
+            className={styles.captureModeGroup}
+          >
+            <Radio.Button value="entities">Entities</Radio.Button>
+            <Radio.Button value="reply">Entire User Reply</Radio.Button>
+          </Radio.Group>
+        </Form.Item>
+
+        <Form.Item label="Prompt">
+          <Input.TextArea
+            value={promptValue}
+            autoSize={{ minRows: 2, maxRows: 6 }}
+            placeholder="Ask the user for the information you need"
+            onChange={(event) => setPromptValue(event.target.value)}
+            onBlur={commitPrompt}
+          />
+        </Form.Item>
+
+        <Form.Item label="Validation">
+          <Input.TextArea
+            value={validationValue}
+            autoSize={{ minRows: 2, maxRows: 6 }}
+            placeholder="Describe any validation requirements"
+            onChange={(event) => setValidationValue(event.target.value)}
+            onBlur={commitValidation}
+          />
+        </Form.Item>
+
+        {captureMode === "reply" && (
+          <Form.Item label="Save reply to variable">
+            <VariablePicker
+              value={replyVariable}
+              onChange={(value) => {
+                const nextValue = value || "";
+                setReplyVariable(nextValue);
+                handleUpdateNode("variable", nextValue);
+              }}
+              placeholder="Select variable"
+              allowCreate
+              createMode="modal"
+            />
+          </Form.Item>
+        )}
+
+        {captureMode === "entities" && (
+          <div className={styles.captureSection}>
+            <div className={styles.captureEntitiesHeader}>
+              <span className={styles.sectionTitle}>Entities</span>
+              <Button
+                type="dashed"
+                size="small"
+                icon={<PlusOutlined />}
+                onClick={addEntityRow}
+                className={styles.captureAddRowButton}
+              >
+                Add entity
+              </Button>
+            </div>
+            {entityRows.length === 0 ? (
+              <div className={styles.captureEmptyState}>
+                Add the entities you want to capture from the user's reply.
+              </div>
+            ) : (
+              <div className={styles.captureEntitiesList}>
+                {entityRows.map((row) => (
+                  <div key={row.id} className={styles.captureEntityRow}>
+                    <div className={styles.captureEntityColumn}>
+                      <EntityPicker
+                        value={row.entity}
+                        onChange={(value) =>
+                          setEntityRowValue(row.id, { entity: value || "" })
+                        }
+                        placeholder="Select entity"
+                      />
+                      <div className={styles.captureEntityMeta}>
+                        <VariablePicker
+                          value={row.variable}
+                          onChange={(value) =>
+                            setEntityRowValue(row.id, {
+                              variable: value || "",
+                            })
+                          }
+                          placeholder="Save to variable"
+                          allowCreate
+                          createMode="modal"
+                        />
+                        <Switch
+                          checkedChildren="Required"
+                          unCheckedChildren="Optional"
+                          checked={row.required}
+                          onChange={(checked) =>
+                            setEntityRowValue(row.id, { required: checked })
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div className={styles.captureEntityActions}>
+                      <Button
+                        type="text"
+                        icon={<DeleteOutlined />}
+                        onClick={() => removeEntityRow(row.id)}
+                        className={styles.captureRemoveButton}
+                        aria-label="Remove entity"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className={styles.captureSection}>
+          <div className={styles.captureToggleCard}>
+            <div className={styles.captureToggleHeader}>
+              <div>
+                <div className={styles.sectionTitle}>No Reply</div>
+                <div className={styles.captureToggleDescription}>
+                  Automatically reprompt the user if they do not respond in
+                  time.
+                </div>
+              </div>
+              <Switch
+                checked={noReplyState.enabled}
+                onChange={(checked) => updateNoReply({ enabled: checked })}
+              />
+            </div>
+            {noReplyState.enabled && (
+              <div className={styles.captureInlineInputs}>
+                <InputNumber
+                  min={1}
+                  max={120}
+                  value={noReplyState.timeout}
+                  addonAfter="s"
+                  onChange={(value) =>
+                    updateNoReply({ timeout: Number(value) || 1 })
+                  }
+                />
+                <Input.TextArea
+                  value={noReplyState.prompt}
+                  autoSize={{ minRows: 2, maxRows: 4 }}
+                  placeholder="Reprompt message"
+                  onChange={(event) =>
+                    updateNoReply({ prompt: event.target.value })
+                  }
+                />
+              </div>
+            )}
+          </div>
+
+          <div className={styles.captureToggleCard}>
+            <div className={styles.captureToggleHeader}>
+              <div>
+                <div className={styles.sectionTitle}>Listen for other triggers</div>
+                <div className={styles.captureToggleDescription}>
+                  Allow intents outside of this capture to interrupt.
+                </div>
+              </div>
+              <Switch
+                checked={listenForOtherTriggersState}
+                onChange={toggleListenForOtherTriggers}
+              />
+            </div>
+          </div>
+
+          {captureMode === "entities" && (
+            <div className={styles.captureToggleCard}>
+              <div className={styles.captureToggleHeader}>
+                <div>
+                  <div className={styles.sectionTitle}>Automatically reprompt</div>
+                  <div className={styles.captureToggleDescription}>
+                    Generate follow-up questions if required entities are
+                    missing.
+                  </div>
+                </div>
+                <Switch
+                  checked={autoRepromptState.enabled}
+                  onChange={(checked) =>
+                    updateAutoReprompt({ enabled: checked })
+                  }
+                />
+              </div>
+              {autoRepromptState.enabled && (
+                <div className={styles.captureSection}>
+                  <div className={styles.captureInlineInputs}>
+                    <InputNumber
+                      min={0}
+                      max={2}
+                      step={0.1}
+                      value={autoRepromptState.temperature}
+                      onChange={(value) =>
+                        updateAutoReprompt({ temperature: Number(value) || 0 })
+                      }
+                      placeholder="Temperature"
+                    />
+                    <InputNumber
+                      min={1}
+                      max={4000}
+                      value={autoRepromptState.maxTokens}
+                      onChange={(value) =>
+                        updateAutoReprompt({ maxTokens: Number(value) || 1 })
+                      }
+                      placeholder="Max tokens"
+                    />
+                  </div>
+                  <Input.TextArea
+                    value={autoRepromptState.systemPrompt}
+                    autoSize={{ minRows: 2, maxRows: 6 }}
+                    placeholder="System prompt"
+                    onChange={(event) =>
+                      updateAutoReprompt({
+                        systemPrompt: event.target.value,
+                      })
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {captureMode === "entities" && (
+          <div className={styles.captureSection}>
+            <div className={styles.captureEntitiesHeader}>
+              <span className={styles.sectionTitle}>Rules</span>
+              <Button
+                type="dashed"
+                size="small"
+                icon={<PlusOutlined />}
+                onClick={addRule}
+              >
+                Add rule
+              </Button>
+            </div>
+            {rules.length === 0 ? (
+              <div className={styles.captureEmptyState}>
+                Add natural language guidance for the AI to validate captured
+                entities.
+              </div>
+            ) : (
+              <div className={styles.captureList}>
+                {rules.map((rule, index) => (
+                  <div key={`rule-${index}`} className={styles.captureListItem}>
+                    <Input.TextArea
+                      value={rule}
+                      onChange={(event) =>
+                        updateRule(index, event.target.value)
+                      }
+                      autoSize={{ minRows: 2, maxRows: 6 }}
+                      className={styles.captureListTextarea}
+                      placeholder="Example: The email address must be valid."
+                    />
+                    <Button
+                      type="text"
+                      icon={<DeleteOutlined />}
+                      onClick={() => removeRule(index)}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className={styles.captureEntitiesHeader}>
+              <span className={styles.sectionTitle}>Exit scenarios</span>
+              <Button
+                type="dashed"
+                size="small"
+                icon={<PlusOutlined />}
+                onClick={addExitScenario}
+              >
+                Add scenario
+              </Button>
+            </div>
+            {exitScenarios.length === 0 ? (
+              <div className={styles.captureEmptyState}>
+                Document when the assistant should stop collecting entities.
+              </div>
+            ) : (
+              <div className={styles.captureList}>
+                {exitScenarios.map((scenario, index) => (
+                  <div
+                    key={`exit-scenario-${index}`}
+                    className={styles.captureListItem}
+                  >
+                    <Input.TextArea
+                      value={scenario}
+                      onChange={(event) =>
+                        updateExitScenario(index, event.target.value)
+                      }
+                      autoSize={{ minRows: 2, maxRows: 6 }}
+                      className={styles.captureListTextarea}
+                      placeholder="Example: The user says they don't have that information."
+                    />
+                    <Button
+                      type="text"
+                      icon={<DeleteOutlined />}
+                      onClick={() => removeExitScenario(index)}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className={styles.captureToggleCard}>
+              <div className={styles.captureToggleHeader}>
+                <div>
+                  <div className={styles.sectionTitle}>Exit path</div>
+                  <div className={styles.captureToggleDescription}>
+                    Provide a dedicated path when an exit scenario is matched.
+                  </div>
+                </div>
+                <Switch
+                  checked={exitPathEnabled}
+                  onChange={toggleExitPath}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </Form>
+    );
+  };
+
   const MessageProperties = () => {
     const PROMPT_VARIANT_PREFIX = "__prompt__:";
     const isPromptVariant = (value: string) =>
@@ -4811,6 +5480,8 @@ export default function PropertiesPanel({
     switch (selectedNode.type) {
       case "start":
         return <StartProperties />;
+      case "capture":
+        return <CaptureProperties />;
       case "message":
         return <MessageProperties />;
       case "prompt":
@@ -4854,6 +5525,8 @@ export default function PropertiesPanel({
   const blockColor =
     selectedNode.type === "start"
       ? "#22c55e"
+      : selectedNode.type === "capture"
+      ? "#8b5cf6"
       : selectedNode.type === "message"
       ? "#1677ff"
       : selectedNode.type === "prompt"

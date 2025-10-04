@@ -63,6 +63,83 @@
   margin-bottom: 4px;
 }
 
+.entityList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.entityRow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.entityName {
+  font-weight: 500;
+  color: #1f2937;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entityVariable {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 12px;
+  color: #475569;
+}
+
+.entityRequired,
+.entityOptional {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+}
+
+.entityRequired {
+  color: #b91c1c;
+  background: #fee2e2;
+  border-color: #fecaca;
+}
+
+.entityOptional {
+  color: #2563eb;
+  background: #dbeafe;
+  border-color: #bfdbfe;
+}
+
+.entityEmpty {
+  font-size: 12px;
+  color: #64748b;
+  text-align: center;
+  padding: 8px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+}
+
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.metaBadge {
+  font-size: 11px;
+  background: #e0f2fe;
+  color: #0369a1;
+  border-radius: 9999px;
+  padding: 2px 8px;
+}
+
 .handle {
   width: 10px;
   height: 10px;

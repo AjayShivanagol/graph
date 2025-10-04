@@ -300,7 +300,22 @@ export default function Sidebar() {
         ...(blockType === "choice" && {
           choices: [createChoice("Choice A"), createChoice("Choice B")],
         }),
-        ...(blockType === "capture" && { variable: "user_input" }),
+        ...(blockType === "capture" && {
+          captureMode: "entities",
+          entities: [],
+          variable: "",
+          listenForOtherTriggers: false,
+          noReply: { enabled: false, timeout: 10, prompt: "" },
+          autoReprompt: {
+            enabled: false,
+            temperature: 0.7,
+            maxTokens: 256,
+            systemPrompt: "",
+          },
+          rules: [],
+          exitScenarios: [],
+          exitPathEnabled: false,
+        }),
         ...(blockType === "condition" && {
           condition: 'variable == "value"',
           paths: [],

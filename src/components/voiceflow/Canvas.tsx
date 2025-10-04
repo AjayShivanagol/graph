@@ -200,7 +200,22 @@ export default function Canvas() {
           ...(type === "choice" && {
             choices: [createChoice("Choice A"), createChoice("Choice B")],
           }),
-          ...(type === "capture" && { variable: "user_input" }),
+          ...(type === "capture" && {
+            captureMode: "entities",
+            entities: [],
+            variable: "",
+            listenForOtherTriggers: false,
+            noReply: { enabled: false, timeout: 10, prompt: "" },
+            autoReprompt: {
+              enabled: false,
+              temperature: 0.7,
+              maxTokens: 256,
+              systemPrompt: "",
+            },
+            rules: [],
+            exitScenarios: [],
+            exitPathEnabled: false,
+          }),
           ...(type === "condition" && {
             condition: 'variable == "value"',
             elsePath: false,
