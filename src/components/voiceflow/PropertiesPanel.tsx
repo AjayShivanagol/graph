@@ -53,6 +53,7 @@ import {
   Tooltip,
   Modal,
   Slider,
+  Radio,
 } from "antd";
 const { TextArea } = Input;
 import type { MenuProps } from "antd";
@@ -3428,7 +3429,8 @@ export default function PropertiesPanel({
     const [exitPathLabel, setExitPathLabel] = useState<string>(
       selectedNode.data.exitPathLabel || "Exit scenario"
     );
-    const [exitPathPopoverOpen, setExitPathPopoverOpen] = useState<boolean>(false);
+    const [exitPathPopoverOpen, setExitPathPopoverOpen] =
+      useState<boolean>(false);
 
     // Local state for editing - prevents focus loss on typing
     const [localRules, setLocalRules] = useState<string[]>(
@@ -4039,7 +4041,14 @@ export default function PropertiesPanel({
                     }}
                     content={
                       <div style={{ width: "200px", padding: "4px" }}>
-                        <Typography.Text style={{ fontSize: "12px", color: "#666", marginBottom: "8px", display: "block" }}>
+                        <Typography.Text
+                          style={{
+                            fontSize: "12px",
+                            color: "#666",
+                            marginBottom: "8px",
+                            display: "block",
+                          }}
+                        >
                           Path label
                         </Typography.Text>
                         <Input
@@ -4066,9 +4075,9 @@ export default function PropertiesPanel({
                       </div>
                     }
                   >
-                    <Typography.Text 
-                      className={styles.sectionHeading} 
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                    <Typography.Text
+                      className={styles.sectionHeading}
+                      style={{ cursor: "pointer", userSelect: "none" }}
                       onClick={() => setExitPathPopoverOpen(true)}
                     >
                       Exit scenario path
@@ -5536,7 +5545,7 @@ export default function PropertiesPanel({
                   setShowAddDialog(true);
                 }
               }}
-              overlayStyle={{ zIndex: 50000 }}
+              overlayStyle={{ zIndex: 1000 }}
               getPopupContainer={() => document.body}
             >
               <Button
@@ -5598,7 +5607,7 @@ export default function PropertiesPanel({
                 if (!open) setEditingVariable(null);
               }}
               placement="right"
-              overlayStyle={{ zIndex: 50000 }}
+              overlayStyle={{ zIndex: 2000 }}
               getPopupContainer={() => document.body}
               content={
                 <VariableEditForm
@@ -6556,6 +6565,14 @@ export default function PropertiesPanel({
             selectedNode={selectedNode}
             handleUpdateNode={handleUpdateNode}
           />
+        );
+      case "end":
+        return (
+          <div className={styles.noPropertiesContainer}>
+            <div className={styles.noPropertiesText}>
+              <Typography.Text strong>End block ends the agent in its current state.</Typography.Text>
+            </div>
+          </div>
         );
       default:
         return <NoProperties />;
