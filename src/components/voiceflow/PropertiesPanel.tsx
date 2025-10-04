@@ -41,7 +41,6 @@ import {
   Dropdown,
   Collapse,
   Switch,
-  Radio,
   Popover,
   Divider,
   Space,
@@ -2871,17 +2870,16 @@ export default function PropertiesPanel({
 
     return (
       <Form layout="vertical">
-        <Form.Item label="Capture mode">
-          <Radio.Group
+        <Form.Item label="Capture">
+          <Select
             value={captureMode}
-            onChange={(event) =>
-              commitCaptureMode(event.target.value as CaptureMode)
-            }
-            className={styles.captureModeGroup}
-          >
-            <Radio.Button value="entities">Entities</Radio.Button>
-            <Radio.Button value="reply">Entire User Reply</Radio.Button>
-          </Radio.Group>
+            onChange={(value) => commitCaptureMode(value as CaptureMode)}
+            options={[
+              { label: "Entities", value: "entities" },
+              { label: "Entire user reply", value: "reply" },
+            ]}
+            className={styles.captureModeSelect}
+          />
         </Form.Item>
 
         <Form.Item label="Prompt">

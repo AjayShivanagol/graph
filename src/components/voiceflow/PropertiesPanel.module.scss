@@ -2185,10 +2185,17 @@
 }
 
 // Capture Properties Styles
-.captureModeGroup {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+.captureModeSelect {
+  max-width: 220px;
+}
+
+.captureModeSelect :global(.ant-select-selector) {
+  border-radius: 12px;
+  padding: 4px 12px;
+}
+
+.captureModeSelect :global(.ant-select-selection-item) {
+  font-weight: 500;
 }
 
 .captureSection {
