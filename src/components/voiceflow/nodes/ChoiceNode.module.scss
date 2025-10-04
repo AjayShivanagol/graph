@@ -1,98 +1,104 @@
+@use "./variables" as *;
+
 .node {
-  background: #ffffff;
-  border: 1px solid #d1d9e0;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  width: 240px;
-  font-family: system-ui, -apple-system, sans-serif;
-  font-size: 14px;
-  color: #1f2328;
+  @extend %node-base;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(107, 114, 128, 0.12);
 
   &.selected {
-    border: 2px solid #1677ff;
-    box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.2);
+    border-color: #8b5cf6;
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.25);
   }
 }
 
-.header {
+.node__content {
+  padding: 14px 16px 16px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.node__prompt {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #4c1d95;
+  background: #f3e8ff;
+  border: 1px solid #ddd6fe;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.node__choiceList {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
-  padding: 8px 10px;
-  border-bottom: 1px solid #f0f0f0;
-  background: #fafafa;
-  border-top-left-radius: 8px;
-  border-top-right-radius: 8px;
 }
 
-.icon {
-  width: 18px;
-  height: 18px;
+.node__empty {
+  font-size: 12px;
+  color: #a855f7;
+  border: 1px dashed rgba(168, 85, 247, 0.4);
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+  background: #faf5ff;
+}
+
+.node__choiceRow {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: #1677ff;
-  background: #e6f4ff;
-  border-radius: 4px;
-
-  .anticon {
-    font-size: 12px;
-  }
+  gap: 12px;
+  border: 1px solid #e9d5ff;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 8px 14px;
+  padding-right: 24px;
+  min-height: 36px;
+  box-shadow: 0 1px 2px rgba(79, 70, 229, 0.08);
+  overflow: visible;
 }
 
-.label {
-  font-size: 12px;
+.node__choiceLabel {
+  font-size: 13px;
   font-weight: 600;
-  color: #1f2937;
+  color: #312e81;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
 }
 
-.labelInput {
-  height: 22px;
+.node__choiceLabelPlaceholder {
+  color: #9ca3af;
+  font-weight: 500;
+  font-style: italic;
+}
+
+.node__choiceHandle {
+  position: absolute;
+  top: 50%;
+  right: -12px;
+  transform: translateY(-50%);
+}
+
+.node__more {
   font-size: 12px;
-  font-weight: 600;
-}
-
-.content {
-  padding: 10px;
-}
-
-.question {
-  font-size: 12px;
-  color: #374151;
-  margin-bottom: 8px;
-}
-
-.choiceItem {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-
-.choiceDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #1677ff;
-}
-
-.choiceText {
-  font-size: 12px;
-  color: #374151;
-}
-
-.moreChoices {
-  font-size: 12px;
-  color: #8c8c8c;
+  color: #6b7280;
+  padding-left: 4px;
 }
 
 .handle {
+  position: absolute;
   width: 10px;
   height: 10px;
-  background: #1677ff;
   border-radius: 5px;
   border: 2px solid white;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+  background: #8b5cf6;
+  pointer-events: auto;
 
   &--top {
     top: -5px;
@@ -100,8 +106,13 @@
     transform: translateX(-50%);
   }
 
-  &--right {
-    right: -5px;
-    transform: translateY(-50%);
+  &--choice {
+    background: #6366f1;
   }
+}
+
+.handleInner {
+  opacity: 0;
+  width: 100%;
+  height: 100%;
 }

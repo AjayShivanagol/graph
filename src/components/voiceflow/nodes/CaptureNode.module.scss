@@ -4,7 +4,10 @@
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   width: 240px;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
   font-size: 14px;
   color: #1f2328;
 
@@ -63,6 +66,152 @@
   margin-bottom: 4px;
 }
 
+.entityList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.entityRow {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #f8fafc;
+  margin-bottom: 4px;
+  position: relative;
+}
+
+.entityContent {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  flex: 1;
+}
+
+.entityHandle {
+  margin-left: 8px;
+  position: absolute;
+  right: -17px; /* Position outside the node border */
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+}
+
+.entityName {
+  font-weight: 500;
+  color: #1f2937;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entityVariable {
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  font-size: 12px;
+  color: #475569;
+}
+
+.entityRequired,
+.entityOptional {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+}
+
+.entityRequired {
+  color: #b91c1c;
+  background: #fee2e2;
+  border-color: #fecaca;
+}
+
+.entityOptional {
+  color: #2563eb;
+  background: #dbeafe;
+  border-color: #bfdbfe;
+}
+
+.entityEmpty {
+  font-size: 12px;
+  color: #64748b;
+  text-align: center;
+  padding: 8px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+}
+
+.exitRow {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid #ff6b35;
+  border-radius: 6px;
+  background: #fff5f2;
+  margin-top: 8px;
+  position: relative;
+}
+
+.exitContent {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.exitName {
+  font-weight: 500;
+  color: #ff6b35;
+  font-size: 13px;
+  cursor: pointer;
+  
+  &:hover {
+    color: #ff5722;
+  }
+}
+
+.exitDescription {
+  font-size: 11px;
+  color: #cc5a2a;
+}
+
+.exitHandle {
+  margin-left: 8px;
+  position: absolute;
+  right: -17px; /* Position outside the node border */
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+}
+
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.metaBadge {
+  font-size: 11px;
+  background: #e0f2fe;
+  color: #0369a1;
+  border-radius: 9999px;
+  padding: 2px 8px;
+}
+
+.clickableBadge {
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #b8e6ff;
+    transform: translateY(-1px);
+  }
+}
+
 .handle {
   width: 10px;
   height: 10px;
@@ -82,5 +231,43 @@
     left: 50%;
     transform: translateX(-50%);
     background: #52c41a;
+  }
+
+  &--right {
+    right: -5px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #52c41a; // Green for entity handles
+  }
+
+  &--entity {
+    position: static;
+    right: auto;
+    top: auto;
+    transform: none;
+    background: #52c41a; // Green for entity handles
+    width: 10px;
+    height: 10px;
+    border-radius: 5px;
+    border: 2px solid white;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+  }
+
+  &--exit {
+    position: static;
+    right: auto;
+    top: auto;
+    transform: none;
+    background: #ff6b35; // Orange for exit handle
+    width: 10px;
+    height: 10px;
+    border-radius: 5px;
+    border: 2px solid white;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+  }
+
+  // Orange color for exit path handle
+  &[data-handleid="exit-path"] {
+    background: #ff6b35 !important;
   }
 }

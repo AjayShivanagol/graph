@@ -1279,6 +1279,158 @@
   padding: 0;
 }
 
+.choiceProperties {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.choiceHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.choiceList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.choiceListItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.choiceListItemActive {
+  .choiceListTrigger {
+    background: #eef2ff;
+    border-color: rgba(79, 70, 229, 0.4);
+  }
+}
+
+.choiceListItemEmpty {
+  justify-content: space-between;
+  align-items: center;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.choiceEmptyLabel {
+  font-size: 13px;
+}
+
+.choiceItemActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.choiceListTrigger {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  padding: 8px 12px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.choiceListTrigger:hover {
+  background: #f1f5f9;
+}
+
+.choiceListTrigger:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+.choiceListTriggerText {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.choiceListTriggerPlaceholder {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.choiceRemoveButton {
+  color: #94a3b8;
+
+  &:global(.ant-btn-text) {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+  }
+
+  &:hover {
+    color: #ef4444;
+    background: transparent;
+  }
+}
+
+.choiceDivider {
+  margin: 4px 0 0;
+}
+
+.choiceAddButton {
+  color: #475569;
+  padding: 0;
+
+  &:hover {
+    color: #0f172a;
+    background: transparent;
+  }
+
+  &:global(.ant-btn) {
+    height: auto;
+  }
+}
+
+.choicePopoverOverlay {
+  max-width: 320px;
+}
+
+.choicePopover {
+  width: 260px;
+}
+
+.choicePopover :global(.ant-form-item) {
+  margin-bottom: 12px;
+}
+
+.choicePopoverTitle {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #1f2937;
+}
+
+.choicePopoverFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .buttonsNodeProperties {
   display: flex;
   flex-direction: column;
@@ -1349,7 +1501,6 @@
   }
 }
 
-
 .buttonsNodeEditor {
   display: flex;
   flex-direction: column;
@@ -1395,6 +1546,12 @@
 
 .buttonsNodeDivider {
   margin: 8px 0 0;
+}
+
+.fallbackSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .buttonsFallbackList {
@@ -1720,7 +1877,9 @@
   cursor: pointer;
   font: inherit;
   appearance: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 
   &:hover,
   &:focus-visible {
@@ -1775,6 +1934,38 @@
   border-radius: 12px;
   height: 36px;
   font-weight: 600;
+}
+
+.buttonsPathLabel {
+  margin-top: 12px;
+  width: 100%;
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  background: #f8fbff;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.buttonsPathLabelTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  letter-spacing: 0.02em;
+}
+
+.buttonsPathLabelValue {
+  font-size: 13px;
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.buttonsPathLabelNote {
+  font-size: 11px;
+  font-weight: 400;
+  color: #64748b;
+  font-style: italic;
 }
 
 .buttonsLinkPopover {
@@ -2024,4 +2215,466 @@
   justify-content: flex-end;
   gap: 8px;
   margin-top: 8px;
+}
+
+// Capture Properties Styles
+.captureModeSelect {
+  max-width: 220px;
+}
+
+.captureModeSelect :global(.ant-select-selector) {
+  border-radius: 12px;
+  padding: 4px 12px;
+}
+
+.captureModeSelect :global(.ant-select-selection-item) {
+  font-weight: 500;
+}
+
+.captureSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.captureEntitiesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.captureEntitiesList {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 16px 0;
+}
+
+.captureEntityRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 0 20px;
+  min-height: 48px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.captureEntityColumn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.captureEntityActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 32px;
+}
+
+.captureRemoveButton {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ef4444;
+  background: #fff5f5;
+
+  &:hover {
+    border-color: #fecaca;
+    background: #fee2e2;
+  }
+}
+
+.captureEntityMeta {
+  display: flex;
+  gap: 8px;
+}
+
+.captureEmptyState {
+  padding: 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #64748b;
+  font-size: 13px;
+  text-align: center;
+}
+
+.captureToggleCard {
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.captureToggleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.captureToggleDescription {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.captureInlineInputs {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.captureList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.captureListItem {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fafc;
+  display: flex;
+  gap: 12px;
+}
+
+.captureListTextarea {
+  flex: 1;
+}
+
+.captureListActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.captureAddRowButton {
+  align-self: flex-start;
+}
+
+.captureFallbackFieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.captureFallbackFieldGroup :global(.ant-input-number),
+.captureFallbackFieldGroup :global(.ant-input) {
+  width: 100%;
+}
+
+.captureFallbackTextarea {
+  width: 100%;
+}
+
+.captureAutoRepromptFields {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.captureAutoRepromptFields > .captureFallbackFieldGroup {
+  flex: 1;
+  min-width: 140px;
+}
+
+// Entity Creation Modal Styles
+.entityPopoverContainer {
+  min-width: 260px;
+  padding: 0;
+}
+
+.entityPopoverSearchContainer {
+  padding: 12px 16px 8px 16px;
+}
+
+.entityPopoverSearchRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.entityPopoverSearchIcon {
+  color: #94a3b8;
+}
+
+.entityPopoverSearchInput {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 16px;
+  background: transparent;
+}
+
+.entityPopoverDivider {
+  border-top: 1px solid #eee;
+}
+
+.entityPopoverList {
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.entityPopoverItem {
+  padding: 12px 16px;
+  cursor: pointer;
+  font-size: 16px;
+
+  &:hover {
+    background-color: #f5f5f5;
+  }
+}
+
+.entityPopoverCreateAction {
+  padding: 12px 16px;
+  text-align: center;
+}
+
+.entityPopoverCreateButton {
+  color: #2563eb;
+  font-weight: 500;
+  cursor: pointer;
+  font-size: 16px;
+
+  &:hover {
+    color: #1d4ed8;
+  }
+}
+
+.entityValuesHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  width: 100%;
+}
+
+.entityValuesLabel {
+  color: rgba(0, 0, 0, 0.85);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.entityValuesRequired {
+  color: #ff4d4f;
+}
+
+.entityValuesContainer {
+  width: 100%;
+}
+
+.entityValueRow {
+  width: 100%;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.entityValueInput {
+  flex: 1;
+  width: 100%;
+}
+
+.entityValuesToggle {
+  text-align: center;
+  padding: 8px 0;
+  border-top: 1px solid #f0f0f0;
+  margin-top: 8px;
+}
+
+.entityValuesToggleButton {
+  padding: 0;
+  height: auto;
+}
+
+.entityValuesHelperText {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+// Entity popover styles
+.entityPopoverContainer {
+  min-width: 260px;
+  padding: 0;
+}
+
+.entityPopoverSearchContainer {
+  padding: 12px 16px 8px 16px;
+}
+
+.entityPopoverSearchRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.entityPopoverSearchIcon {
+  color: #94a3b8;
+}
+
+.entityPopoverSearchInput {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 16px;
+  background: transparent;
+}
+
+.entityPopoverDivider {
+  border-top: 1px solid #eee;
+}
+
+.entityPopoverList {
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.entityPopoverItem {
+  padding: 12px 16px;
+  cursor: pointer;
+  font-size: 16px;
+
+  &:hover {
+    background-color: #f8f9fa;
+  }
+}
+
+.entityPopoverCreateAction {
+  padding: 12px 16px;
+  text-align: center;
+}
+
+.entityPopoverCreateButton {
+  color: #2563eb;
+  font-weight: 500;
+  cursor: pointer;
+  font-size: 16px;
+
+  &:hover {
+    color: #1d4ed8;
+  }
+}
+
+// Entity modal styles
+.entityModalValuesHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  width: 100%;
+}
+
+.entityModalValuesLabel {
+  color: rgba(0, 0, 0, 0.85);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.entityModalRequiredStar {
+  color: #ff4d4f;
+}
+
+.entityModalValuesContainer {
+  width: 100%;
+}
+
+.entityModalValueRow {
+  width: 100%;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.entityModalValueInput {
+  flex: 1;
+  width: 100%;
+}
+
+.entityModalToggleContainer {
+  text-align: center;
+  padding: 8px 0;
+  border-top: 1px solid #f0f0f0;
+  margin-top: 8px;
+}
+
+.entityModalToggleButton {
+  padding: 0;
+  height: auto;
+}
+
+.entityModalHelperText {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+// Rules section clean styling
+.rulesContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ruleItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 0;
+}
+
+.ruleTextarea {
+  flex: 1;
+  border-radius: 6px !important;
+  border: 1px solid #e8e8e8 !important;
+  font-size: 14px !important;
+  line-height: 20px !important;
+  padding: 8px 12px !important;
+  resize: none !important;
+  background-color: #ffffff !important;
+}
+
+.ruleRemoveButton {
+  min-width: 32px !important;
+  height: 32px !important;
+  padding: 4px !important;
+  border: none !important;
+  border-radius: 4px !important;
+  color: #8c8c8c !important;
+  background-color: transparent !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-top: 4px !important;
+
+  &:hover {
+    background-color: #f5f5f5 !important;
+    color: #000000 !important;
+  }
+}
+
+.rulesSectionDivider {
+  margin: 20px 0;
+  border-color: #f0f0f0;
 }

@@ -29,6 +29,12 @@ import {
   BranchesOutlined,
   ToolOutlined,
   AppstoreOutlined,
+  MinusCircleOutlined,
+  InboxOutlined,
+  CrownOutlined,
+  ThunderboltOutlined,
+  RocketOutlined,
+  StarOutlined,
 } from "@ant-design/icons";
 import {
   Typography,
@@ -41,15 +47,19 @@ import {
   Dropdown,
   Collapse,
   Switch,
-  Radio,
   Popover,
   Divider,
   Space,
   Tooltip,
+  Modal,
+  Slider,
 } from "antd";
+const { TextArea } = Input;
 import type { MenuProps } from "antd";
 import Editor from "@monaco-editor/react";
 import VariablePicker from "../common/VariablePicker";
+import IntentPicker from "../common/IntentPicker";
+import EntityPicker from "../common/EntityPicker";
 import PromptPicker from "../common/PromptPicker";
 import PromptEditor from "../common/PromptEditor";
 import ValueInput, { ValueInputHandle } from "../common/ValueInput";
@@ -68,6 +78,36 @@ import {
   addNode,
 } from "../../store/slices/workflowSlice";
 import { showToast } from "../../store/slices/uiSlice";
+import { addEntity, addEntityDetailed } from "../../store/slices/entitiesSlice";
+
+// AI Models configuration
+const AI_MODELS = [
+  {
+    value: "claude-4-sonnet",
+    label: "Claude 4 - Sonnet",
+    icon: <CrownOutlined style={{ color: "#ff6b35" }} />,
+  },
+  {
+    value: "gpt-4o",
+    label: "GPT-4o",
+    icon: <ThunderboltOutlined style={{ color: "#10b981" }} />,
+  },
+  {
+    value: "gpt-4-turbo",
+    label: "GPT-4 Turbo",
+    icon: <RocketOutlined style={{ color: "#3b82f6" }} />,
+  },
+  {
+    value: "claude-3-opus",
+    label: "Claude 3 - Opus",
+    icon: <StarOutlined style={{ color: "#8b5cf6" }} />,
+  },
+  {
+    value: "claude-3-sonnet",
+    label: "Claude 3 - Sonnet",
+    icon: <StarOutlined style={{ color: "#06b6d4" }} />,
+  },
+];
 
 type ImageSourceType = "upload" | "link";
 
@@ -102,10 +142,272 @@ interface ButtonsNodeButton {
   matchType: ButtonMatchType;
 }
 
-const buttonsEqual = (
-  a: ButtonsNodeButton[],
-  b: ButtonsNodeButton[]
-) => {
+interface ChoiceOption {
+  id: string;
+  label: string;
+  intent?: string;
+  buttonLabel?: string;
+}
+
+type CaptureMode = "entities" | "reply";
+
+interface CaptureEntityConfig {
+  id: string;
+  entity: string;
+  variable: string;
+  required: boolean;
+}
+
+interface CaptureNoReplyConfig {
+  enabled: boolean;
+  timeout: number;
+  reprompts: string[];
+  followPath?: boolean;
+  pathLabel?: string;
+}
+
+interface CaptureAutoRepromptConfig {
+  enabled: boolean;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  systemPrompt: string;
+}
+
+const generateCaptureEntityId = () =>
+  `capture-entity-${Math.random()
+    .toString(36)
+    .slice(2, 8)}-${Date.now().toString(36)}`;
+
+const ensureCaptureEntity = (
+  entry: any,
+  index: number
+): CaptureEntityConfig => {
+  const fallbackId = `capture-entity-${index}`;
+  if (!entry || typeof entry !== "object") {
+    return {
+      id: fallbackId,
+      entity: "",
+      variable: "",
+      required: true,
+    };
+  }
+
+  const rawEntity =
+    typeof entry.entity === "string"
+      ? entry.entity
+      : typeof entry.name === "string"
+      ? entry.name
+      : "";
+  const rawVariable =
+    typeof entry.variable === "string"
+      ? entry.variable
+      : typeof entry.slot === "string"
+      ? entry.slot
+      : "";
+
+  return {
+    id: typeof entry.id === "string" ? entry.id : fallbackId,
+    entity: rawEntity.trim(),
+    variable: rawVariable.trim(),
+    required: entry.required === false ? false : true,
+  };
+};
+
+const normalizeCaptureEntities = (input: any): CaptureEntityConfig[] => {
+  if (!Array.isArray(input)) return [];
+  return input.map((entry, index) => ensureCaptureEntity(entry, index));
+};
+
+const ensureNoReplyConfig = (input: any): CaptureNoReplyConfig => {
+  const timeout = Number.isFinite(input?.timeout) ? Number(input.timeout) : 10;
+  return {
+    enabled: !!input?.enabled,
+    timeout: timeout > 0 ? timeout : 10,
+    reprompts: Array.isArray(input?.reprompts) ? input.reprompts : [""],
+    followPath:
+      typeof input?.followPath === "boolean" ? input.followPath : false,
+    pathLabel: typeof input?.pathLabel === "string" ? input.pathLabel : "",
+  };
+};
+
+const ensureAutoRepromptConfig = (input: any): CaptureAutoRepromptConfig => {
+  const temperature = Number.isFinite(input?.temperature)
+    ? Number(input.temperature)
+    : 0.7;
+  const maxTokens = Number.isFinite(input?.maxTokens)
+    ? Number(input.maxTokens)
+    : 256;
+
+  return {
+    enabled: !!input?.enabled,
+    model: typeof input?.model === "string" ? input.model : "claude-4-sonnet",
+    temperature: Math.min(Math.max(temperature, 0), 2),
+    maxTokens: Math.max(Math.floor(maxTokens), 1),
+    systemPrompt:
+      typeof input?.systemPrompt === "string" ? input.systemPrompt : "",
+  };
+};
+
+const serializeCaptureEntities = (
+  entries: CaptureEntityConfig[]
+): CaptureEntityConfig[] =>
+  entries.map((entry, index) => ({
+    id: entry.id || `capture-entity-${index}`,
+    entity: entry.entity.trim(),
+    variable: entry.variable.trim(),
+    required: entry.required !== false,
+  }));
+
+const serializeNoReplyConfig = (config: CaptureNoReplyConfig) => ({
+  enabled: !!config.enabled,
+  timeout: Math.max(Math.floor(config.timeout) || 1, 1),
+  reprompts: config.reprompts,
+  followPath: config.followPath,
+  pathLabel: config.pathLabel,
+});
+
+const serializeAutoRepromptConfig = (config: CaptureAutoRepromptConfig) => ({
+  enabled: !!config.enabled,
+  model: config.model,
+  temperature: Number(config.temperature.toFixed(2)),
+  maxTokens: Math.max(Math.floor(config.maxTokens) || 1, 1),
+  systemPrompt: config.systemPrompt,
+});
+
+const captureNoReplyEqual = (
+  a: CaptureNoReplyConfig,
+  b: CaptureNoReplyConfig
+) =>
+  a.enabled === b.enabled &&
+  a.timeout === b.timeout &&
+  JSON.stringify(a.reprompts) === JSON.stringify(b.reprompts) &&
+  a.followPath === b.followPath &&
+  a.pathLabel === b.pathLabel;
+
+const captureAutoRepromptEqual = (
+  a: CaptureAutoRepromptConfig,
+  b: CaptureAutoRepromptConfig
+) =>
+  a.enabled === b.enabled &&
+  a.model === b.model &&
+  Number(a.temperature.toFixed(2)) === Number(b.temperature.toFixed(2)) &&
+  a.maxTokens === b.maxTokens &&
+  a.systemPrompt === b.systemPrompt;
+
+const normalizeStringList = (value: any): string[] => {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => `${entry ?? ""}`);
+};
+
+const serializeStringList = (values: string[]) =>
+  values.map((entry) => `${entry ?? ""}`.trim());
+
+interface FallbackSettingsProps {
+  selectedNode: any;
+  selectedNodeId: string;
+  handleUpdateNodeBatch: (fields: Record<string, any>) => void;
+}
+
+const generateChoiceId = () =>
+  `choice-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}`;
+
+const ensureChoiceOption = (choice: any, index: number): ChoiceOption => {
+  const fallbackId = `choice-${index}`;
+  if (!choice) {
+    return {
+      id: fallbackId,
+      label: "",
+    };
+  }
+
+  if (typeof choice === "string") {
+    return {
+      id: fallbackId,
+      label: choice,
+    };
+  }
+
+  const rawLabel =
+    typeof choice.label === "string"
+      ? choice.label
+      : typeof choice.text === "string"
+      ? choice.text
+      : undefined;
+  const rawIntent =
+    typeof choice.intent === "string"
+      ? choice.intent
+      : typeof choice.intentName === "string"
+      ? choice.intentName
+      : undefined;
+  const rawButtonLabel =
+    typeof choice.buttonLabel === "string"
+      ? choice.buttonLabel
+      : typeof choice.button === "string"
+      ? choice.button
+      : undefined;
+  return {
+    id: typeof choice.id === "string" ? choice.id : fallbackId,
+    label: typeof rawLabel === "string" ? rawLabel : "",
+    intent: typeof rawIntent === "string" ? rawIntent : undefined,
+    buttonLabel:
+      typeof rawButtonLabel === "string" ? rawButtonLabel : undefined,
+  };
+};
+
+const normalizeChoiceOptions = (choices: any[]): ChoiceOption[] => {
+  if (!Array.isArray(choices)) return [];
+  return choices.map((choice, index) => {
+    const ensured = ensureChoiceOption(choice, index);
+    const rawLabel = typeof ensured.label === "string" ? ensured.label : "";
+    const trimmedLabel = rawLabel.trim();
+    const rawIntent = typeof ensured.intent === "string" ? ensured.intent : "";
+    const trimmedIntent = rawIntent.trim();
+    const rawButtonLabel =
+      typeof ensured.buttonLabel === "string" ? ensured.buttonLabel : "";
+    return {
+      id: ensured.id,
+      label:
+        trimmedLabel.length > 0
+          ? trimmedLabel
+          : trimmedIntent.length > 0
+          ? trimmedIntent
+          : "",
+      intent: trimmedIntent || undefined,
+      buttonLabel: rawButtonLabel.trim() || undefined,
+    };
+  });
+};
+
+const choicesEqual = (
+  left: ChoiceOption[] = [],
+  right: ChoiceOption[] = []
+): boolean => {
+  if (left.length !== right.length) return false;
+  for (let i = 0; i < left.length; i += 1) {
+    const a = left[i];
+    const b = right[i];
+    if (!b) return false;
+    if (a.id !== b.id) return false;
+    if ((a.label || "") !== (b.label || "")) return false;
+    if ((a.intent || "") !== (b.intent || "")) return false;
+    if ((a.buttonLabel || "") !== (b.buttonLabel || "")) return false;
+  }
+  return true;
+};
+
+const createDefaultChoiceList = (): ChoiceOption[] => [
+  {
+    id: generateChoiceId(),
+    label: "",
+  },
+  {
+    id: generateChoiceId(),
+    label: "",
+  },
+];
+
+const buttonsEqual = (a: ButtonsNodeButton[], b: ButtonsNodeButton[]) => {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i += 1) {
     const btnA = a[i];
@@ -187,6 +489,1253 @@ const fallbackConfigsEqual = (
   }
 
   return true;
+};
+
+const FallbackSettings: React.FC<FallbackSettingsProps> = ({
+  selectedNode,
+  selectedNodeId,
+  handleUpdateNodeBatch,
+}) => {
+  const rawNoMatch = selectedNode.data?.noMatch as
+    | ButtonsFallbackConfig
+    | undefined;
+  const rawNoReply = selectedNode.data?.noReply as
+    | ButtonsFallbackConfig
+    | undefined;
+  const listenForOtherTriggers = !!selectedNode.data?.listenForOtherTriggers;
+
+  const [noMatchConfig, setNoMatchConfig] = useState<ButtonsFallbackConfig>(
+    ensureFallbackReprompts(normalizeFallbackConfig(rawNoMatch))
+  );
+  const [noReplyConfig, setNoReplyConfig] = useState<ButtonsFallbackConfig>(
+    ensureFallbackReprompts(
+      normalizeFallbackConfig(rawNoReply, { inactivityTimeout: 10 })
+    )
+  );
+  const [fallbackPopover, setFallbackPopover] = useState<
+    "noMatch" | "noReply" | null
+  >(null);
+  const [draftNoMatch, setDraftNoMatch] = useState<ButtonsFallbackConfig>(
+    ensureFallbackReprompts(normalizeFallbackConfig(rawNoMatch))
+  );
+  const [draftNoReply, setDraftNoReply] = useState<ButtonsFallbackConfig>(
+    ensureFallbackReprompts(
+      normalizeFallbackConfig(rawNoReply, { inactivityTimeout: 10 })
+    )
+  );
+  const repromptRefs = useRef<Record<number, RichTextEditorHandle | null>>({});
+  const [editingRepromptIndex, setEditingRepromptIndex] = useState<
+    number | null
+  >(null);
+  const [pathLabelPopover, setPathLabelPopover] = useState<
+    "noMatch" | "noReply" | null
+  >(null);
+
+  useEffect(() => {
+    setNoMatchConfig(
+      ensureFallbackReprompts(normalizeFallbackConfig(rawNoMatch))
+    );
+  }, [rawNoMatch, selectedNodeId]);
+
+  useEffect(() => {
+    setNoReplyConfig(
+      ensureFallbackReprompts(
+        normalizeFallbackConfig(rawNoReply, { inactivityTimeout: 10 })
+      )
+    );
+  }, [rawNoReply, selectedNodeId]);
+
+  useEffect(() => {
+    if (fallbackPopover !== "noMatch") {
+      setDraftNoMatch(ensureFallbackReprompts(noMatchConfig));
+    }
+  }, [noMatchConfig, fallbackPopover]);
+
+  useEffect(() => {
+    if (fallbackPopover !== "noReply") {
+      setDraftNoReply(ensureFallbackReprompts(noReplyConfig));
+    }
+  }, [noReplyConfig, fallbackPopover]);
+
+  useEffect(() => {
+    if (editingRepromptIndex === null) return;
+    const focusLater = () => {
+      const ref = repromptRefs.current[editingRepromptIndex];
+      ref?.focus?.();
+    };
+    const id = window.setTimeout(focusLater, 0);
+    return () => window.clearTimeout(id);
+  }, [editingRepromptIndex, fallbackPopover]);
+
+  useEffect(() => {
+    setFallbackPopover(null);
+  }, [selectedNodeId]);
+
+  useEffect(() => {
+    if (!fallbackPopover) {
+      setPathLabelPopover(null);
+    }
+  }, [fallbackPopover]);
+
+  const commitNoMatch = (next: ButtonsFallbackConfig) => {
+    setNoMatchConfig(next);
+    handleUpdateNodeBatch({ noMatch: next });
+  };
+
+  const commitNoReply = (next: ButtonsFallbackConfig) => {
+    setNoReplyConfig(next);
+    handleUpdateNodeBatch({ noReply: next });
+  };
+
+  const toggleNoMatch = (enabled: boolean) => {
+    const nextConfig: ButtonsFallbackConfig = {
+      ...noMatchConfig,
+      enabled,
+      reprompts:
+        enabled && noMatchConfig.reprompts.length === 0
+          ? [""]
+          : noMatchConfig.reprompts,
+    };
+    commitNoMatch(nextConfig);
+    setFallbackPopover((prev) =>
+      enabled ? "noMatch" : prev === "noMatch" ? null : prev
+    );
+    setDraftNoMatch(ensureFallbackReprompts(nextConfig));
+  };
+
+  const toggleNoReply = (enabled: boolean) => {
+    const nextConfig: ButtonsFallbackConfig = {
+      ...noReplyConfig,
+      enabled,
+      reprompts:
+        enabled && noReplyConfig.reprompts.length === 0
+          ? [""]
+          : noReplyConfig.reprompts,
+      inactivityTimeout:
+        typeof noReplyConfig.inactivityTimeout === "number"
+          ? noReplyConfig.inactivityTimeout
+          : 10,
+    };
+    commitNoReply(nextConfig);
+    setFallbackPopover((prev) =>
+      enabled ? "noReply" : prev === "noReply" ? null : prev
+    );
+    setDraftNoReply(ensureFallbackReprompts(nextConfig));
+  };
+
+  const renderRepromptEditor = (
+    draft: ButtonsFallbackConfig,
+    setDraft: React.Dispatch<React.SetStateAction<ButtonsFallbackConfig>>,
+    options: {
+      showInactivity?: boolean;
+      followPathLabel?: string;
+      context: "noMatch" | "noReply";
+    }
+  ) => {
+    const safeDraft = ensureFallbackReprompts(draft);
+
+    const updateDraft = (
+      updater: (current: ButtonsFallbackConfig) => ButtonsFallbackConfig
+    ) => {
+      setDraft((current) => {
+        const ensuredCurrent = ensureFallbackReprompts(current);
+        const next = ensureFallbackReprompts(updater(ensuredCurrent));
+        return next;
+      });
+    };
+
+    const handleAddReprompt = () => {
+      updateDraft((current) => ({
+        ...current,
+        reprompts: [...current.reprompts, ""],
+      }));
+    };
+
+    const handleGenerateReprompts = (count: number) => {
+      if (!Number.isFinite(count) || count <= 0) return;
+      updateDraft((current) => {
+        const ensuredCurrent = ensureFallbackReprompts(current);
+        let nextReprompts = ensuredCurrent.reprompts.slice(0, count);
+        if (nextReprompts.length < count) {
+          nextReprompts = [
+            ...nextReprompts,
+            ...Array(count - nextReprompts.length).fill(""),
+          ];
+        }
+        return {
+          ...ensuredCurrent,
+          reprompts: nextReprompts,
+        };
+      });
+      setEditingRepromptIndex(count - 1);
+    };
+
+    const handleRemoveReprompt = (index: number) => {
+      updateDraft((current) => {
+        const nextPrompts = current.reprompts.filter((_, idx) => idx !== index);
+        return {
+          ...current,
+          reprompts: nextPrompts.length ? nextPrompts : [""],
+        };
+      });
+      setEditingRepromptIndex((current) => {
+        if (current === null) return current;
+        if (current === index) return null;
+        if (current > index) return current - 1;
+        return current;
+      });
+      delete repromptRefs.current[index];
+    };
+
+    return (
+      <div className={styles.buttonsFallbackCard}>
+        {options?.showInactivity && (
+          <div className={styles.buttonsFallbackFieldRow}>
+            <div className={styles.buttonsFallbackFieldLabel}>
+              Inactivity time (sec)
+            </div>
+            <InputNumber
+              min={1}
+              value={safeDraft.inactivityTimeout || 10}
+              onChange={(value) =>
+                updateDraft((current) => ({
+                  ...current,
+                  inactivityTimeout:
+                    typeof value === "number"
+                      ? value
+                      : current.inactivityTimeout,
+                }))
+              }
+            />
+          </div>
+        )}
+        <Typography.Text className={styles.buttonsFallbackCardTitle}>
+          Reprompts
+        </Typography.Text>
+        <div className={styles.buttonsRepromptList}>
+          {safeDraft.reprompts.map((reprompt, index) => {
+            const isEditing = editingRepromptIndex === index;
+
+            return (
+              <div key={index} className={styles.buttonsRepromptRow}>
+                <div className={styles.buttonsRepromptEditor}>
+                  {isEditing ? (
+                    <RichTextEditor
+                      ref={(instance) => {
+                        if (instance) {
+                          repromptRefs.current[index] = instance;
+                        } else {
+                          delete repromptRefs.current[index];
+                        }
+                      }}
+                      value={reprompt}
+                      onChange={(value) =>
+                        updateDraft((current) => {
+                          const nextPrompts = [...current.reprompts];
+                          nextPrompts[index] = value;
+                          return {
+                            ...current,
+                            reprompts: nextPrompts,
+                          };
+                        })
+                      }
+                      placeholder={`Enter reprompt ${index + 1}`}
+                      className={styles.buttonsRichEditor}
+                      onBlur={() => {
+                        window.setTimeout(() => {
+                          setEditingRepromptIndex((current) =>
+                            current === index ? null : current
+                          );
+                        }, 150);
+                      }}
+                    />
+                  ) : (
+                    <div
+                      className={styles.buttonsRepromptPreview}
+                      onClick={() => {
+                        setEditingRepromptIndex(index);
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setEditingRepromptIndex(index);
+                        }
+                      }}
+                      dangerouslySetInnerHTML={{
+                        __html: reprompt.trim().length
+                          ? renderFormattedReprompt(reprompt)
+                          : `<span class="placeholder">Enter reprompt ${
+                              index + 1
+                            }</span>`,
+                      }}
+                    />
+                  )}
+                </div>
+                <Button
+                  type="text"
+                  icon={<MinusOutlined />}
+                  className={styles.buttonsRepromptRemove}
+                  onClick={() => handleRemoveReprompt(index)}
+                  disabled={safeDraft.reprompts.length <= 1}
+                />
+              </div>
+            );
+          })}
+        </div>
+        <div className={styles.buttonsRepromptActions}>
+          <Dropdown
+            trigger={["click"]}
+            overlayClassName={styles.buttonsRepromptGenerateMenu}
+            menu={{
+              items: [
+                { key: "1", label: "Generate 1 variant" },
+                { key: "3", label: "Generate 3 variants" },
+                { key: "5", label: "Generate 5 variants" },
+              ],
+              onClick: ({ key }) => {
+                const parsed = Number.parseInt(key, 10);
+                handleGenerateReprompts(Number.isNaN(parsed) ? 0 : parsed);
+              },
+            }}
+          >
+            <Button className={styles.buttonsRepromptGenerate}>
+              <span className={styles.buttonsRepromptGenerateIcon}>✨</span>
+              Generate
+              <DownOutlined className={styles.buttonsRepromptGenerateCaret} />
+            </Button>
+          </Dropdown>
+          <Button
+            type="dashed"
+            icon={<PlusOutlined />}
+            onClick={handleAddReprompt}
+            className={styles.buttonsRepromptAdd}
+          >
+            Add reprompt
+          </Button>
+        </div>
+        <div className={styles.buttonsFollowPathRow}>
+          <span className={styles.buttonsFollowPathLabel}>
+            Follow path after reprompts?
+          </span>
+          <Switch
+            checked={!!safeDraft.followPath}
+            onChange={(checked) => {
+              updateDraft((current) => {
+                const ensuredCurrent = ensureFallbackReprompts(current);
+                return {
+                  ...ensuredCurrent,
+                  followPath: checked,
+                  pathLabel: checked
+                    ? ensuredCurrent.pathLabel?.trim()
+                      ? ensuredCurrent.pathLabel
+                      : options.followPathLabel || ""
+                    : ensuredCurrent.pathLabel,
+                };
+              });
+              setPathLabelPopover((current) => {
+                if (checked) {
+                  return options.context;
+                }
+                return current === options.context ? null : current;
+              });
+            }}
+          />
+        </div>
+        {safeDraft.followPath && (
+          <Popover
+            trigger={["click"]}
+            destroyTooltipOnHide
+            placement="left"
+            overlayClassName={styles.buttonsPathLabelPopover}
+            open={pathLabelPopover === options.context}
+            onOpenChange={(open) => {
+              setPathLabelPopover((current) => {
+                if (open) {
+                  return options.context;
+                }
+                return current === options.context ? null : current;
+              });
+            }}
+            content={
+              <div className={styles.buttonsPathLabelPopoverContent}>
+                <Typography.Text
+                  className={styles.buttonsPathLabelPopoverTitle}
+                >
+                  Path label
+                </Typography.Text>
+                <Input
+                  autoFocus
+                  value={safeDraft.pathLabel || ""}
+                  onChange={(event) => {
+                    const { value } = event.target;
+                    updateDraft((current) => ({
+                      ...ensureFallbackReprompts(current),
+                      pathLabel: value,
+                    }));
+                  }}
+                  placeholder={
+                    options.followPathLabel ||
+                    `Enter ${
+                      options.context === "noMatch" ? "no match" : "no reply"
+                    } label`
+                  }
+                  className={styles.buttonsPathLabelInput}
+                  onPressEnter={() =>
+                    setPathLabelPopover((current) =>
+                      current === options.context ? null : current
+                    )
+                  }
+                />
+                <Button
+                  type="primary"
+                  className={styles.buttonsPathLabelDone}
+                  onClick={() =>
+                    setPathLabelPopover((current) =>
+                      current === options.context ? null : current
+                    )
+                  }
+                >
+                  Done
+                </Button>
+              </div>
+            }
+          >
+            <button type="button" className={styles.buttonsPathLabelTrigger}>
+              <span className={styles.buttonsPathLabelTriggerTitle}>
+                Path label
+              </span>
+              <span className={styles.buttonsPathLabelTriggerValue}>
+                {safeDraft.pathLabel?.trim() ||
+                  options.followPathLabel ||
+                  `Enter ${
+                    options.context === "noMatch" ? "no match" : "no reply"
+                  } label`}
+              </span>
+            </button>
+          </Popover>
+        )}
+      </div>
+    );
+  };
+
+  const handleFallbackOpenChange =
+    (key: "noMatch" | "noReply") => (visible: boolean) => {
+      setFallbackPopover((prev) => {
+        if (visible) {
+          if (prev && prev !== key) {
+            commitDraftConfig(prev);
+          }
+          if (key === "noMatch") {
+            setDraftNoMatch(ensureFallbackReprompts(noMatchConfig));
+          } else {
+            setDraftNoReply(ensureFallbackReprompts(noReplyConfig));
+          }
+          setPathLabelPopover(null);
+          return key;
+        }
+        commitDraftConfig(key);
+        setPathLabelPopover((current) => (current === key ? null : current));
+        return prev === key ? null : prev;
+      });
+    };
+
+  const setListenForOtherTriggers = (checked: boolean) => {
+    handleUpdateNodeBatch({ listenForOtherTriggers: checked });
+  };
+
+  const commitDraftConfig = useCallback(
+    (key: "noMatch" | "noReply") => {
+      if (key === "noMatch") {
+        const ensured = ensureFallbackReprompts(draftNoMatch);
+        if (!fallbackConfigsEqual(ensured, noMatchConfig)) {
+          commitNoMatch(ensured);
+        }
+        setDraftNoMatch(ensured);
+      } else {
+        const ensured = ensureFallbackReprompts(draftNoReply);
+        if (!fallbackConfigsEqual(ensured, noReplyConfig)) {
+          commitNoReply(ensured);
+        }
+        setDraftNoReply(ensured);
+      }
+      setEditingRepromptIndex(null);
+    },
+    [
+      draftNoMatch,
+      draftNoReply,
+      noMatchConfig,
+      noReplyConfig,
+      commitNoMatch,
+      commitNoReply,
+    ]
+  );
+
+  return (
+    <div className={styles.fallbackSection}>
+      <Typography.Text className={styles.sectionHeading}>
+        Fallbacks
+      </Typography.Text>
+      <div className={styles.buttonsFallbackList}>
+        <Popover
+          trigger={["click"]}
+          destroyOnHidden
+          placement="left"
+          overlayClassName={styles.buttonsFallbackPopover}
+          open={fallbackPopover === "noMatch"}
+          onOpenChange={handleFallbackOpenChange("noMatch")}
+          content={renderRepromptEditor(draftNoMatch, setDraftNoMatch, {
+            context: "noMatch",
+            followPathLabel: "No match",
+          })}
+        >
+          <div
+            className={`${styles.buttonsFallbackItem} ${
+              fallbackPopover === "noMatch"
+                ? styles.buttonsFallbackItemActive
+                : ""
+            } ${
+              !noMatchConfig.enabled && fallbackPopover !== "noMatch"
+                ? styles.buttonsFallbackItemInactive
+                : ""
+            }`}
+          >
+            <span className={styles.buttonsFallbackItemLabel}>No match</span>
+            <span
+              className={styles.buttonsFallbackSwitch}
+              onClick={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <Switch
+                checked={!!noMatchConfig.enabled}
+                onChange={toggleNoMatch}
+              />
+            </span>
+          </div>
+        </Popover>
+
+        <Popover
+          trigger={["click"]}
+          destroyOnHidden
+          placement="left"
+          overlayClassName={styles.buttonsFallbackPopover}
+          open={fallbackPopover === "noReply"}
+          onOpenChange={handleFallbackOpenChange("noReply")}
+          content={renderRepromptEditor(draftNoReply, setDraftNoReply, {
+            showInactivity: true,
+            context: "noReply",
+            followPathLabel: "No reply",
+          })}
+        >
+          <div
+            className={`${styles.buttonsFallbackItem} ${
+              fallbackPopover === "noReply"
+                ? styles.buttonsFallbackItemActive
+                : ""
+            } ${
+              !noReplyConfig.enabled && fallbackPopover !== "noReply"
+                ? styles.buttonsFallbackItemInactive
+                : ""
+            }`}
+          >
+            <span className={styles.buttonsFallbackItemLabel}>No reply</span>
+            <span
+              className={styles.buttonsFallbackSwitch}
+              onClick={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <Switch
+                checked={!!noReplyConfig.enabled}
+                onChange={toggleNoReply}
+              />
+            </span>
+          </div>
+        </Popover>
+
+        <div
+          className={`${styles.buttonsFallbackItem} ${
+            !listenForOtherTriggers ? styles.buttonsFallbackItemInactive : ""
+          } ${styles.buttonsFallbackItemStatic}`}
+        >
+          <span className={styles.buttonsFallbackItemLabel}>
+            Listen for other triggers
+          </span>
+          <span
+            className={styles.buttonsFallbackSwitch}
+            onClick={(event) => event.stopPropagation()}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <Switch
+              checked={listenForOtherTriggers}
+              onChange={setListenForOtherTriggers}
+            />
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+interface CaptureFallbackSettingsProps {
+  noReply: CaptureNoReplyConfig;
+  onChangeNoReply: (next: CaptureNoReplyConfig) => void;
+  autoReprompt: CaptureAutoRepromptConfig;
+  onChangeAutoReprompt: (next: CaptureAutoRepromptConfig) => void;
+  listenForOtherTriggers: boolean;
+  onListenForOtherTriggersChange: (checked: boolean) => void;
+  showAutoReprompt: boolean;
+}
+
+const CaptureFallbackSettings: React.FC<CaptureFallbackSettingsProps> = ({
+  noReply,
+  onChangeNoReply,
+  autoReprompt,
+  onChangeAutoReprompt,
+  listenForOtherTriggers,
+  onListenForOtherTriggersChange,
+  showAutoReprompt,
+}) => {
+  const [activePopover, setActivePopover] = useState<
+    "noReply" | "autoReprompt" | null
+  >(null);
+  const [draftNoReply, setDraftNoReply] = useState<CaptureNoReplyConfig>(
+    ensureNoReplyConfig(noReply)
+  );
+  const [draftAutoReprompt, setDraftAutoReprompt] =
+    useState<CaptureAutoRepromptConfig>(ensureAutoRepromptConfig(autoReprompt));
+  const [editingRepromptIndex, setEditingRepromptIndex] = useState<
+    number | null
+  >(null);
+  const repromptRefs = useRef<Record<number, RichTextEditorHandle | null>>({});
+  const [pathLabelPopover, setPathLabelPopover] = useState<
+    "noReply" | "autoReprompt" | null
+  >(null);
+
+  useEffect(() => {
+    if (activePopover !== "noReply") {
+      setDraftNoReply(ensureNoReplyConfig(noReply));
+    }
+  }, [noReply, activePopover]);
+
+  useEffect(() => {
+    if (activePopover !== "autoReprompt") {
+      setDraftAutoReprompt(ensureAutoRepromptConfig(autoReprompt));
+    }
+  }, [autoReprompt, activePopover]);
+
+  useEffect(() => {
+    if (!showAutoReprompt && activePopover === "autoReprompt") {
+      setActivePopover(null);
+    }
+  }, [showAutoReprompt, activePopover]);
+
+  useEffect(() => {
+    if (editingRepromptIndex === null) return;
+    window.setTimeout(() => {
+      const ref = repromptRefs.current[editingRepromptIndex];
+      if (ref) ref.focus();
+    }, 100);
+  }, [editingRepromptIndex, activePopover]);
+
+  const commitDraft = useCallback(
+    (key: "noReply" | "autoReprompt") => {
+      if (key === "noReply") {
+        const ensured = ensureNoReplyConfig({
+          ...draftNoReply,
+          enabled: ensureNoReplyConfig(noReply).enabled,
+        });
+        if (!captureNoReplyEqual(ensured, ensureNoReplyConfig(noReply))) {
+          onChangeNoReply(ensured);
+        }
+        setDraftNoReply(ensured);
+      } else {
+        const ensured = ensureAutoRepromptConfig({
+          ...draftAutoReprompt,
+          enabled: ensureAutoRepromptConfig(autoReprompt).enabled,
+        });
+        if (
+          !captureAutoRepromptEqual(
+            ensured,
+            ensureAutoRepromptConfig(autoReprompt)
+          )
+        ) {
+          onChangeAutoReprompt(ensured);
+        }
+        setDraftAutoReprompt(ensured);
+      }
+    },
+    [
+      autoReprompt,
+      draftAutoReprompt,
+      draftNoReply,
+      noReply,
+      onChangeAutoReprompt,
+      onChangeNoReply,
+    ]
+  );
+
+  const handleOpenChange = useCallback(
+    (key: "noReply" | "autoReprompt") => (open: boolean) => {
+      setActivePopover((current) => {
+        if (open) {
+          if (current && current !== key) {
+            commitDraft(current);
+          }
+          if (key === "noReply") {
+            setDraftNoReply(ensureNoReplyConfig(noReply));
+          } else {
+            setDraftAutoReprompt(ensureAutoRepromptConfig(autoReprompt));
+          }
+          return key;
+        }
+        commitDraft(key);
+        setEditingRepromptIndex(null);
+        setPathLabelPopover((current) => (current === key ? null : current));
+        return current === key ? null : current;
+      });
+    },
+    [autoReprompt, commitDraft, noReply]
+  );
+
+  const toggleNoReply = (checked: boolean) => {
+    const ensured = ensureNoReplyConfig({ ...noReply, enabled: checked });
+    if (!captureNoReplyEqual(ensured, ensureNoReplyConfig(noReply))) {
+      onChangeNoReply(ensured);
+    }
+    setDraftNoReply(ensured);
+    setActivePopover((current) => {
+      if (checked) {
+        return "noReply";
+      }
+      return current === "noReply" ? null : current;
+    });
+  };
+
+  const toggleAutoReprompt = (checked: boolean) => {
+    const ensured = ensureAutoRepromptConfig({
+      ...autoReprompt,
+      enabled: checked,
+    });
+    if (
+      !captureAutoRepromptEqual(ensured, ensureAutoRepromptConfig(autoReprompt))
+    ) {
+      onChangeAutoReprompt(ensured);
+    }
+    setDraftAutoReprompt(ensured);
+    setActivePopover((current) => {
+      if (checked) {
+        return "autoReprompt";
+      }
+      return current === "autoReprompt" ? null : current;
+    });
+  };
+
+  return (
+    <div className={styles.fallbackSection}>
+      <Typography.Text className={styles.sectionHeading}>
+        Fallbacks
+      </Typography.Text>
+      <div className={styles.buttonsFallbackList}>
+        <Popover
+          trigger={["click"]}
+          destroyOnHidden
+          placement="left"
+          overlayClassName={styles.buttonsFallbackPopover}
+          open={activePopover === "noReply"}
+          onOpenChange={handleOpenChange("noReply")}
+          content={
+            <div className={styles.buttonsFallbackCard}>
+              <div className={styles.buttonsFallbackFieldRow}>
+                <div className={styles.buttonsFallbackFieldLabel}>
+                  Inactivity time (sec)
+                </div>
+                <InputNumber
+                  min={1}
+                  max={120}
+                  value={draftNoReply.timeout}
+                  onChange={(value) => {
+                    setDraftNoReply((current) => ({
+                      ...current,
+                      timeout:
+                        typeof value === "number"
+                          ? Math.max(Math.floor(value), 1)
+                          : current.timeout,
+                    }));
+                  }}
+                />
+              </div>
+              <Typography.Text className={styles.buttonsFallbackCardTitle}>
+                Reprompts
+              </Typography.Text>
+              <div className={styles.buttonsRepromptList}>
+                {draftNoReply.reprompts.map((reprompt, index) => {
+                  const isEditing = editingRepromptIndex === index;
+
+                  return (
+                    <div key={index} className={styles.buttonsRepromptRow}>
+                      <div className={styles.buttonsRepromptEditor}>
+                        {isEditing ? (
+                          <RichTextEditor
+                            ref={(instance) => {
+                              if (instance) {
+                                repromptRefs.current[index] = instance;
+                              } else {
+                                delete repromptRefs.current[index];
+                              }
+                            }}
+                            value={reprompt}
+                            onChange={(value) => {
+                              setDraftNoReply((current) => {
+                                const nextReprompts = [...current.reprompts];
+                                nextReprompts[index] = value;
+                                return {
+                                  ...current,
+                                  reprompts: nextReprompts,
+                                };
+                              });
+                            }}
+                            placeholder={`Enter reprompt ${index + 1}`}
+                            className={styles.buttonsRichEditor}
+                            onBlur={() => {
+                              window.setTimeout(() => {
+                                setEditingRepromptIndex((current) =>
+                                  current === index ? null : current
+                                );
+                              }, 150);
+                            }}
+                          />
+                        ) : (
+                          <div
+                            className={styles.buttonsRepromptPreview}
+                            onClick={() => {
+                              setEditingRepromptIndex(index);
+                            }}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                setEditingRepromptIndex(index);
+                              }
+                            }}
+                            dangerouslySetInnerHTML={{
+                              __html: reprompt.trim().length
+                                ? renderFormattedReprompt(reprompt)
+                                : `<span class="placeholder">Enter reprompt ${
+                                    index + 1
+                                  }</span>`,
+                            }}
+                          />
+                        )}
+                      </div>
+                      <Button
+                        type="text"
+                        icon={<MinusOutlined />}
+                        className={styles.buttonsRepromptRemove}
+                        onClick={() => {
+                          setDraftNoReply((current) => {
+                            const nextReprompts = current.reprompts.filter(
+                              (_, idx) => idx !== index
+                            );
+                            return {
+                              ...current,
+                              reprompts: nextReprompts.length
+                                ? nextReprompts
+                                : [""],
+                            };
+                          });
+                          setEditingRepromptIndex((current) => {
+                            if (current === null) return current;
+                            if (current === index) return null;
+                            if (current > index) return current - 1;
+                            return current;
+                          });
+                          delete repromptRefs.current[index];
+                        }}
+                        disabled={draftNoReply.reprompts.length <= 1}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              <div className={styles.buttonsRepromptActions}>
+                <Dropdown
+                  trigger={["click"]}
+                  overlayClassName={styles.buttonsRepromptGenerateMenu}
+                  menu={{
+                    items: [
+                      { key: "1", label: "Generate 1 variant" },
+                      { key: "3", label: "Generate 3 variants" },
+                      { key: "5", label: "Generate 5 variants" },
+                    ],
+                    onClick: ({ key }) => {
+                      const count = Number.parseInt(key, 10);
+                      if (!Number.isFinite(count) || count <= 0) return;
+                      setDraftNoReply((current) => {
+                        let nextReprompts = current.reprompts.slice(0, count);
+                        if (nextReprompts.length < count) {
+                          nextReprompts = [
+                            ...nextReprompts,
+                            ...Array(count - nextReprompts.length).fill(""),
+                          ];
+                        }
+                        return {
+                          ...current,
+                          reprompts: nextReprompts,
+                        };
+                      });
+                      setEditingRepromptIndex(count - 1);
+                    },
+                  }}
+                >
+                  <Button className={styles.buttonsRepromptGenerate}>
+                    <span className={styles.buttonsRepromptGenerateIcon}>
+                      ✨
+                    </span>
+                    Generate
+                    <DownOutlined
+                      className={styles.buttonsRepromptGenerateCaret}
+                    />
+                  </Button>
+                </Dropdown>
+                <Button
+                  type="dashed"
+                  icon={<PlusOutlined />}
+                  onClick={() => {
+                    setDraftNoReply((current) => {
+                      const newIndex = current.reprompts.length;
+                      setEditingRepromptIndex(newIndex);
+                      return {
+                        ...current,
+                        reprompts: [...current.reprompts, ""],
+                      };
+                    });
+                  }}
+                  className={styles.buttonsRepromptAdd}
+                >
+                  Add reprompt
+                </Button>
+              </div>
+              <div className={styles.buttonsFollowPathRow}>
+                <span className={styles.buttonsFollowPathLabel}>
+                  Follow path after reprompts?
+                </span>
+                <Switch
+                  checked={!!draftNoReply.followPath}
+                  onChange={(checked) => {
+                    setDraftNoReply((current) => ({
+                      ...current,
+                      followPath: checked,
+                      pathLabel: checked
+                        ? current.pathLabel?.trim()
+                          ? current.pathLabel
+                          : "No reply"
+                        : current.pathLabel,
+                    }));
+                    setPathLabelPopover((current) => {
+                      if (checked) {
+                        return "noReply";
+                      }
+                      return current === "noReply" ? null : current;
+                    });
+                  }}
+                />
+              </div>
+              {draftNoReply.followPath && (
+                <Popover
+                  trigger={["click"]}
+                  destroyTooltipOnHide
+                  placement="left"
+                  overlayClassName={styles.buttonsPathLabelPopover}
+                  open={pathLabelPopover === "noReply"}
+                  onOpenChange={(open) => {
+                    setPathLabelPopover((current) => {
+                      if (open) {
+                        return "noReply";
+                      }
+                      return current === "noReply" ? null : current;
+                    });
+                  }}
+                  content={
+                    <div className={styles.buttonsPathLabelPopoverContent}>
+                      <Typography.Text
+                        className={styles.buttonsPathLabelPopoverTitle}
+                      >
+                        Path label
+                      </Typography.Text>
+                      <Input
+                        autoFocus
+                        value={draftNoReply.pathLabel || ""}
+                        onChange={(event) => {
+                          const { value } = event.target;
+                          setDraftNoReply((current) => ({
+                            ...current,
+                            pathLabel: value,
+                          }));
+                        }}
+                        placeholder="Enter no reply label"
+                        className={styles.buttonsPathLabelInput}
+                        onPressEnter={() =>
+                          setPathLabelPopover((current) =>
+                            current === "noReply" ? null : current
+                          )
+                        }
+                      />
+                      <Button
+                        type="primary"
+                        className={styles.buttonsPathLabelDone}
+                        onClick={() =>
+                          setPathLabelPopover((current) =>
+                            current === "noReply" ? null : current
+                          )
+                        }
+                      >
+                        Done
+                      </Button>
+                    </div>
+                  }
+                >
+                  <button
+                    type="button"
+                    className={styles.buttonsPathLabelTrigger}
+                  >
+                    <span className={styles.buttonsPathLabelTriggerTitle}>
+                      Path label
+                    </span>
+                    <span className={styles.buttonsPathLabelTriggerValue}>
+                      {draftNoReply.pathLabel?.trim() || "No reply"}
+                    </span>
+                  </button>
+                </Popover>
+              )}
+            </div>
+          }
+        >
+          <div
+            className={`${styles.buttonsFallbackItem} ${
+              activePopover === "noReply"
+                ? styles.buttonsFallbackItemActive
+                : ""
+            } ${
+              !noReply.enabled && activePopover !== "noReply"
+                ? styles.buttonsFallbackItemInactive
+                : ""
+            }`}
+          >
+            <span className={styles.buttonsFallbackItemLabel}>No reply</span>
+            <span
+              className={styles.buttonsFallbackSwitch}
+              onClick={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <Switch checked={!!noReply.enabled} onChange={toggleNoReply} />
+            </span>
+          </div>
+        </Popover>
+
+        {showAutoReprompt && (
+          <Popover
+            trigger={["click"]}
+            destroyOnHidden
+            placement="left"
+            overlayClassName={styles.buttonsFallbackPopover}
+            open={activePopover === "autoReprompt"}
+            onOpenChange={handleOpenChange("autoReprompt")}
+            content={
+              <div className={styles.buttonsFallbackCard}>
+                <Typography.Text
+                  strong
+                  style={{ display: "block", marginBottom: "8px" }}
+                >
+                  Overrides
+                </Typography.Text>
+
+                <div style={{ marginBottom: "24px" }}>
+                  <Typography.Title level={5} style={{ margin: "8px 0" }}>
+                    AI model
+                  </Typography.Title>
+                  <Select
+                    value={draftAutoReprompt.model}
+                    onChange={(value) => {
+                      setDraftAutoReprompt((current) => ({
+                        ...current,
+                        model: value,
+                      }));
+                    }}
+                    style={{ width: "100%" }}
+                    optionLabelProp="label"
+                  >
+                    {AI_MODELS.map((model) => (
+                      <Select.Option
+                        key={model.value}
+                        value={model.value}
+                        label={model.label}
+                      >
+                        <Space>
+                          <span>{model.icon}</span>
+                          <span>{model.label}</span>
+                        </Space>
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </div>
+
+                <div style={{ marginBottom: "24px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    <Typography.Text strong>Temperature</Typography.Text>
+                    <Typography.Text>
+                      {draftAutoReprompt.temperature}
+                    </Typography.Text>
+                  </div>
+                  <Slider
+                    min={0}
+                    max={2}
+                    step={0.1}
+                    value={draftAutoReprompt.temperature}
+                    onChange={(value) => {
+                      setDraftAutoReprompt((current) => ({
+                        ...current,
+                        temperature: value,
+                      }));
+                    }}
+                    style={{ margin: "16px 0" }}
+                  />
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "12px",
+                      color: "#999",
+                    }}
+                  >
+                    <span>Deterministic</span>
+                    <span>Random</span>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: "24px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    <Typography.Text strong>Max tokens</Typography.Text>
+                    <Typography.Text>
+                      {draftAutoReprompt.maxTokens}
+                    </Typography.Text>
+                  </div>
+                  <Slider
+                    min={10}
+                    max={24000}
+                    step={100}
+                    value={draftAutoReprompt.maxTokens}
+                    onChange={(value) => {
+                      setDraftAutoReprompt((current) => ({
+                        ...current,
+                        maxTokens: value,
+                      }));
+                    }}
+                    style={{ margin: "16px 0" }}
+                  />
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "12px",
+                      color: "#999",
+                    }}
+                  >
+                    <span>10</span>
+                    <span>24000</span>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: "8px" }}>
+                  <Typography.Title level={5} style={{ margin: "8px 0" }}>
+                    System
+                  </Typography.Title>
+                  <Input.TextArea
+                    value={draftAutoReprompt.systemPrompt}
+                    autoSize={{ minRows: 3, maxRows: 6 }}
+                    placeholder="You are a helpful assistant collecting data from the user."
+                    onChange={(event) => {
+                      const { value } = event.target;
+                      setDraftAutoReprompt((current) => ({
+                        ...current,
+                        systemPrompt: value,
+                      }));
+                    }}
+                    style={{
+                      borderRadius: "8px",
+                      border: "1px solid #d9d9d9",
+                      padding: "8px 12px",
+                    }}
+                  />
+                </div>
+              </div>
+            }
+          >
+            <div
+              className={`${styles.buttonsFallbackItem} ${
+                activePopover === "autoReprompt"
+                  ? styles.buttonsFallbackItemActive
+                  : ""
+              } ${
+                !autoReprompt.enabled && activePopover !== "autoReprompt"
+                  ? styles.buttonsFallbackItemInactive
+                  : ""
+              }`}
+            >
+              <span className={styles.buttonsFallbackItemLabel}>
+                Automatically reprompt
+              </span>
+              <span
+                className={styles.buttonsFallbackSwitch}
+                onClick={(event) => event.stopPropagation()}
+                onMouseDown={(event) => event.stopPropagation()}
+              >
+                <Switch
+                  checked={!!autoReprompt.enabled}
+                  onChange={toggleAutoReprompt}
+                />
+              </span>
+            </div>
+          </Popover>
+        )}
+
+        <div
+          className={`${styles.buttonsFallbackItem} ${
+            !listenForOtherTriggers ? styles.buttonsFallbackItemInactive : ""
+          } ${styles.buttonsFallbackItemStatic}`}
+        >
+          <span className={styles.buttonsFallbackItemLabel}>
+            Listen for other triggers
+          </span>
+          <span
+            className={styles.buttonsFallbackSwitch}
+            onClick={(event) => event.stopPropagation()}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <Switch
+              checked={listenForOtherTriggers}
+              onChange={onListenForOtherTriggersChange}
+            />
+          </span>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 interface CarouselCard {
@@ -1477,7 +3026,7 @@ const ButtonListEditor: React.FC<ButtonListEditorProps> = ({
         onClose={closeDrawer}
         width={420}
         closable={false}
-        destroyOnClose
+        destroyOnHidden
         className={styles.buttonDrawer}
         title={
           <div className={styles.buttonDrawerTitle}>
@@ -1601,6 +3150,38 @@ const ButtonListEditor: React.FC<ButtonListEditorProps> = ({
                                     actions: normalizeButtonActions(updated),
                                   }));
                                 }}
+                              />
+                            )}
+                            {action.type === "go_to_intent" && (
+                              <IntentPicker
+                                value={(action.data?.intent as string) || ""}
+                                onChange={(nextIntent) => {
+                                  const trimmed = (nextIntent || "").trim();
+                                  const updated = (
+                                    drawerButton.actions || []
+                                  ).map((a) => {
+                                    if (a.id !== action.id) return a;
+                                    const nextData = { ...(a.data || {}) };
+                                    if (trimmed) {
+                                      nextData.intent = trimmed;
+                                    } else {
+                                      delete nextData.intent;
+                                    }
+                                    return {
+                                      ...a,
+                                      data: nextData,
+                                    };
+                                  });
+                                  updateDrawerButton((current) => ({
+                                    ...current,
+                                    actions: normalizeButtonActions(updated),
+                                  }));
+                                }}
+                                placeholder="Select or create intent"
+                                allowCreate
+                                allowClear
+                                createMode="modal"
+                                size="middle"
                               />
                             )}
                             {action.type === "open_url" && (
@@ -1801,6 +3382,868 @@ export default function PropertiesPanel({
       </Form.Item>
     </Form>
   );
+
+  const CaptureProperties = () => {
+    const [entityPopoverOpen, setEntityPopoverOpen] = useState(false);
+    const [entitySearch, setEntitySearch] = useState("");
+    const [entityCreationModalOpen, setEntityCreationModalOpen] =
+      useState(false);
+    const [bulkImportModalOpen, setBulkImportModalOpen] = useState(false);
+    const [bulkImportText, setBulkImportText] = useState("");
+    const [isDragActive, setIsDragActive] = useState(false);
+    const [newEntityName, setNewEntityName] = useState("");
+    const [entityDataType, setEntityDataType] = useState("custom");
+    const [entityValues, setEntityValues] = useState<string[]>([""]);
+    const [showAllValues, setShowAllValues] = useState(false);
+    const entities = useAppSelector((s) => s.entities?.list || []);
+    const entityDataTypes = useAppSelector((s) => s.entities?.dataTypes || []);
+    const [captureMode, setCaptureMode] = useState<CaptureMode>(
+      selectedNode.data.captureMode === "reply" ? "reply" : "entities"
+    );
+    const [entityRows, setEntityRows] = useState<CaptureEntityConfig[]>(
+      normalizeCaptureEntities(selectedNode.data.entities)
+    );
+    // Removed promptValue and validationValue
+    const [replyVariable, setReplyVariable] = useState<string>(
+      selectedNode.data.variable || ""
+    );
+    const [listenForOtherTriggersState, setListenForOtherTriggersState] =
+      useState<boolean>(!!selectedNode.data.listenForOtherTriggers);
+    const [noReplyState, setNoReplyState] = useState<CaptureNoReplyConfig>(
+      ensureNoReplyConfig(selectedNode.data.noReply)
+    );
+    const [autoRepromptState, setAutoRepromptState] =
+      useState<CaptureAutoRepromptConfig>(
+        ensureAutoRepromptConfig(selectedNode.data.autoReprompt)
+      );
+    const [rules, setRules] = useState<string[]>(
+      normalizeStringList(selectedNode.data.rules)
+    );
+    const [exitScenarios, setExitScenarios] = useState<string[]>(
+      normalizeStringList(selectedNode.data.exitScenarios)
+    );
+    const [exitPathEnabled, setExitPathEnabled] = useState<boolean>(
+      !!selectedNode.data.exitPathEnabled
+    );
+    const [exitPathLabel, setExitPathLabel] = useState<string>(
+      selectedNode.data.exitPathLabel || "Exit scenario"
+    );
+    const [exitPathPopoverOpen, setExitPathPopoverOpen] = useState<boolean>(false);
+
+    // Local state for editing - prevents focus loss on typing
+    const [localRules, setLocalRules] = useState<string[]>(
+      normalizeStringList(selectedNode.data.rules)
+    );
+    const [localExitScenarios, setLocalExitScenarios] = useState<string[]>(
+      normalizeStringList(selectedNode.data.exitScenarios)
+    );
+
+    useEffect(() => {
+      setCaptureMode(
+        selectedNode.data.captureMode === "reply" ? "reply" : "entities"
+      );
+      setEntityRows(normalizeCaptureEntities(selectedNode.data.entities));
+      // Removed prompt and validation from effect
+      setReplyVariable(selectedNode.data.variable || "");
+      setListenForOtherTriggersState(
+        !!selectedNode.data.listenForOtherTriggers
+      );
+      setNoReplyState(ensureNoReplyConfig(selectedNode.data.noReply));
+      setAutoRepromptState(
+        ensureAutoRepromptConfig(selectedNode.data.autoReprompt)
+      );
+      setRules(normalizeStringList(selectedNode.data.rules));
+      setExitScenarios(normalizeStringList(selectedNode.data.exitScenarios));
+      setExitPathEnabled(!!selectedNode.data.exitPathEnabled);
+      setExitPathLabel(selectedNode.data.exitPathLabel || "Exit scenario");
+      // Sync local state with main state
+      setLocalRules(normalizeStringList(selectedNode.data.rules));
+      setLocalExitScenarios(
+        normalizeStringList(selectedNode.data.exitScenarios)
+      );
+    }, [
+      selectedNodeId,
+      selectedNode.data.captureMode,
+      selectedNode.data.entities,
+      selectedNode.data.prompt,
+      selectedNode.data.validation,
+      selectedNode.data.variable,
+      selectedNode.data.listenForOtherTriggers,
+      selectedNode.data.noReply,
+      selectedNode.data.autoReprompt,
+      selectedNode.data.rules,
+      selectedNode.data.exitScenarios,
+      selectedNode.data.exitPathEnabled,
+      selectedNode.data.exitPathLabel,
+    ]);
+
+    const commitPrompt = () => {
+      // Removed commitPrompt
+    };
+
+    const commitValidation = () => {
+      // Removed commitValidation
+    };
+
+    const updateEntities = (
+      producer: (current: CaptureEntityConfig[]) => CaptureEntityConfig[]
+    ) => {
+      setEntityRows((current) => {
+        const next = producer(current);
+        handleUpdateNodeBatch({
+          entities: serializeCaptureEntities(next),
+        });
+        return next;
+      });
+    };
+
+    const addEntityRow = (entityName?: string) => {
+      const nameToAdd = entityName !== undefined ? entityName : entitySearch;
+      if (!nameToAdd) return;
+      updateEntities((current) => [
+        ...current,
+        {
+          id: generateCaptureEntityId(),
+          entity: nameToAdd,
+          variable: "",
+          required: true,
+        },
+      ]);
+      setEntityPopoverOpen(false);
+      setEntitySearch("");
+    };
+
+    const handleCreateNewEntity = () => {
+      const trimmed = newEntityName.trim();
+      if (!trimmed) return;
+
+      // Parse entity values
+      const normalizedValues = entityValues
+        .map((entry) =>
+          entry
+            .split(",")
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0)
+        )
+        .filter((parts) => parts.length > 0)
+        .map((parts) => ({
+          value: parts[0],
+          synonyms: parts.slice(1).length > 0 ? parts.slice(1) : undefined,
+        }));
+
+      // Create entity with details
+      dispatch(
+        addEntityDetailed({
+          name: trimmed,
+          dataType: entityDataType,
+          values: normalizedValues.length ? normalizedValues : undefined,
+        })
+      );
+
+      // Add to current capture entity list
+      addEntityRow(trimmed);
+
+      // Reset modal state
+      setNewEntityName("");
+      setEntityDataType("custom");
+      setEntityValues([""]);
+      setShowAllValues(false);
+      setEntityCreationModalOpen(false);
+      setEntityPopoverOpen(false);
+    };
+
+    const addEntityValueRow = () => {
+      setEntityValues((current) => [...current, ""]);
+      // Reset to collapsed view when adding new values if we're above the limit
+      if (entityValues.length >= 8) {
+        setShowAllValues(false);
+      }
+    };
+
+    const removeEntityValueRow = (index: number) => {
+      setEntityValues((current) => {
+        const next = current.filter((_, i) => i !== index);
+        return next.length > 0 ? next : [""];
+      });
+    };
+
+    const handleEntityValueChange = (index: number, value: string) => {
+      setEntityValues((current) => {
+        const updated = [...current];
+        updated[index] = value;
+        return updated;
+      });
+    };
+
+    const handleBulkImport = () => {
+      const entries = bulkImportText
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+      setEntityValues(entries.length > 0 ? entries : [""]);
+      setShowAllValues(false); // Reset to collapsed view after bulk import
+      setBulkImportModalOpen(false);
+      setBulkImportText("");
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragActive(true);
+    };
+
+    const handleDragEnter = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragActive(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Only set to false if we're leaving the textarea entirely
+      const rect = (e.target as HTMLElement).getBoundingClientRect();
+      const x = e.clientX;
+      const y = e.clientY;
+      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+        setIsDragActive(false);
+      }
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragActive(false);
+
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length === 0) return;
+
+      const file = files[0];
+
+      // Check if it's a CSV file or text file
+      if (
+        file.type === "text/csv" ||
+        file.type === "text/plain" ||
+        file.name.endsWith(".csv") ||
+        file.name.endsWith(".txt")
+      ) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const content = event.target?.result as string;
+          if (content) {
+            setBulkImportText(content);
+            dispatch(
+              showToast({
+                message: `Successfully loaded ${file.name}`,
+                type: "success",
+              })
+            );
+          }
+        };
+        reader.readAsText(file);
+      } else {
+        // Show error for unsupported file types
+        dispatch(
+          showToast({
+            message: "Please drop a CSV or text file",
+            type: "error",
+          })
+        );
+      }
+    };
+
+    const removeEntityRow = (rowId: string) => {
+      updateEntities((current) => current.filter((row) => row.id !== rowId));
+    };
+
+    const setEntityRowValue = (
+      rowId: string,
+      patch: Partial<CaptureEntityConfig>
+    ) => {
+      updateEntities((current) =>
+        current.map((row) =>
+          row.id === rowId
+            ? {
+                ...row,
+                ...patch,
+                entity: patch.entity !== undefined ? patch.entity : row.entity,
+                variable:
+                  patch.variable !== undefined ? patch.variable : row.variable,
+                required:
+                  patch.required !== undefined ? patch.required : row.required,
+              }
+            : row
+        )
+      );
+    };
+
+    const commitCaptureMode = (nextMode: CaptureMode) => {
+      setCaptureMode(nextMode);
+      if (nextMode === "reply") {
+        const normalized = replyVariable.trim() || "user_input";
+        setReplyVariable(normalized);
+        handleUpdateNodeBatch({ captureMode: nextMode, variable: normalized });
+      } else {
+        handleUpdateNodeBatch({ captureMode: nextMode });
+      }
+    };
+
+    const toggleListenForOtherTriggers = (checked: boolean) => {
+      setListenForOtherTriggersState(checked);
+      handleUpdateNodeBatch({ listenForOtherTriggers: checked });
+    };
+
+    const commitNoReplyConfig = useCallback(
+      (next: CaptureNoReplyConfig) => {
+        const ensured = ensureNoReplyConfig(next);
+        setNoReplyState((current) => {
+          if (!captureNoReplyEqual(current, ensured)) {
+            handleUpdateNodeBatch({
+              noReply: serializeNoReplyConfig(ensured),
+            });
+          }
+          return ensured;
+        });
+      },
+      [handleUpdateNodeBatch]
+    );
+
+    const commitAutoRepromptConfig = useCallback(
+      (next: CaptureAutoRepromptConfig) => {
+        const ensured = ensureAutoRepromptConfig(next);
+        setAutoRepromptState((current) => {
+          if (!captureAutoRepromptEqual(current, ensured)) {
+            handleUpdateNodeBatch({
+              autoReprompt: serializeAutoRepromptConfig(ensured),
+            });
+          }
+          return ensured;
+        });
+      },
+      [handleUpdateNodeBatch]
+    );
+
+    const addRule = () => {
+      const newRules = [...localRules, ""];
+      setLocalRules(newRules);
+      setRules(newRules);
+      handleUpdateNodeBatch({ rules: serializeStringList(newRules) });
+    };
+
+    const updateRuleLocal = (index: number, value: string) => {
+      setLocalRules((current) => {
+        const next = [...current];
+        next[index] = value;
+        return next;
+      });
+    };
+
+    const commitRule = (index: number) => {
+      const updatedRules = [...localRules];
+      setRules(updatedRules);
+      handleUpdateNodeBatch({ rules: serializeStringList(updatedRules) });
+    };
+
+    const removeRule = (index: number) => {
+      const newRules = localRules.filter((_, idx) => idx !== index);
+      setLocalRules(newRules);
+      setRules(newRules);
+      handleUpdateNodeBatch({ rules: serializeStringList(newRules) });
+    };
+
+    const addExitScenario = () => {
+      const newScenarios = [...localExitScenarios, ""];
+      setLocalExitScenarios(newScenarios);
+      setExitScenarios(newScenarios);
+      handleUpdateNodeBatch({
+        exitScenarios: serializeStringList(newScenarios),
+      });
+    };
+
+    const updateExitScenarioLocal = (index: number, value: string) => {
+      setLocalExitScenarios((current) => {
+        const next = [...current];
+        next[index] = value;
+        return next;
+      });
+    };
+
+    const commitExitScenario = (index: number) => {
+      const updatedScenarios = [...localExitScenarios];
+      setExitScenarios(updatedScenarios);
+      handleUpdateNodeBatch({
+        exitScenarios: serializeStringList(updatedScenarios),
+      });
+    };
+
+    const removeExitScenario = (index: number) => {
+      const newScenarios = localExitScenarios.filter((_, idx) => idx !== index);
+      setLocalExitScenarios(newScenarios);
+      setExitScenarios(newScenarios);
+      handleUpdateNodeBatch({
+        exitScenarios: serializeStringList(newScenarios),
+      });
+    };
+
+    const toggleExitPath = (checked: boolean) => {
+      setExitPathEnabled(checked);
+      handleUpdateNodeBatch({
+        exitPathEnabled: checked,
+        exitPathLabel: checked ? exitPathLabel : undefined,
+      });
+    };
+
+    return (
+      <div className={styles.choiceProperties}>
+        <Form layout="vertical">
+          <Form.Item label="Capture">
+            <Select
+              value={captureMode}
+              onChange={(value) => commitCaptureMode(value as CaptureMode)}
+              options={[
+                { label: "Entities", value: "entities" },
+                { label: "Entire user reply", value: "reply" },
+              ]}
+              className={styles.captureModeSelect}
+            />
+          </Form.Item>
+          {captureMode === "reply" && (
+            <Form.Item label="Save reply to variable">
+              <VariablePicker
+                value={replyVariable}
+                onChange={(value) => {
+                  const nextValue = value || "";
+                  setReplyVariable(nextValue);
+                  handleUpdateNode("variable", nextValue);
+                }}
+                placeholder="Select variable"
+                allowCreate
+                createMode="modal"
+              />
+            </Form.Item>
+          )}
+        </Form>
+
+        {captureMode === "entities" && (
+          <>
+            <div className={styles.choiceHeaderRow}>
+              <Typography.Text className={styles.sectionHeading}>
+                Entities
+              </Typography.Text>
+              <Popover
+                trigger="click"
+                open={entityPopoverOpen}
+                onOpenChange={setEntityPopoverOpen}
+                placement="bottomRight"
+                content={
+                  <div className={styles.entityPopoverContainer}>
+                    <div className={styles.entityPopoverSearchContainer}>
+                      <div className={styles.entityPopoverSearchRow}>
+                        <span className={styles.entityPopoverSearchIcon}>
+                          <svg width="18" height="18" fill="none">
+                            <path
+                              d="M8.5 15.5a7 7 0 1 1 0-14 7 7 0 0 1 0 14Zm5.5-1-3-3"
+                              stroke="#94a3b8"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                        </span>
+                        <input
+                          className={styles.entityPopoverSearchInput}
+                          placeholder="Search"
+                          value={entitySearch}
+                          onChange={(e) => setEntitySearch(e.target.value)}
+                          autoFocus
+                        />
+                      </div>
+                    </div>
+                    <div className={styles.entityPopoverDivider} />
+                    <div className={styles.entityPopoverList}>
+                      {entities
+                        .filter(
+                          (e) =>
+                            !entitySearch ||
+                            e.toLowerCase().includes(entitySearch.toLowerCase())
+                        )
+                        .filter(
+                          (e) => !entityRows.some((row) => row.entity === e)
+                        )
+                        .map((e) => (
+                          <div
+                            key={e}
+                            className={styles.entityPopoverItem}
+                            onClick={() => addEntityRow(e)}
+                          >
+                            {e}
+                          </div>
+                        ))}
+                    </div>
+                    <div className={styles.entityPopoverDivider} />
+                    <div className={styles.entityPopoverCreateAction}>
+                      <span
+                        className={styles.entityPopoverCreateButton}
+                        onClick={() => setEntityCreationModalOpen(true)}
+                      >
+                        Create entity
+                      </span>
+                    </div>
+                  </div>
+                }
+              >
+                <Button
+                  icon={<PlusOutlined />}
+                  type="text"
+                  className={styles.choiceAddButton}
+                />
+              </Popover>
+            </div>
+            <div className={styles.choiceList}>
+              <div className={styles.captureEntitiesList}>
+                {entityRows.map((row) => (
+                  <div key={row.id} className={styles.captureEntityRow}>
+                    <div className={styles.captureEntityColumn}>
+                      <span className={styles.captureEntityText}>
+                        {row.entity}
+                      </span>
+                    </div>
+                    <div className={styles.captureEntityActions}>
+                      <Button
+                        type="text"
+                        icon={<MinusOutlined />}
+                        onClick={() => removeEntityRow(row.id)}
+                        className={styles.choiceRemoveButton}
+                        aria-label="Remove entity"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <Divider className={styles.choiceDivider} />
+          </>
+        )}
+
+        <CaptureFallbackSettings
+          noReply={noReplyState}
+          onChangeNoReply={commitNoReplyConfig}
+          autoReprompt={autoRepromptState}
+          onChangeAutoReprompt={commitAutoRepromptConfig}
+          listenForOtherTriggers={listenForOtherTriggersState}
+          onListenForOtherTriggersChange={toggleListenForOtherTriggers}
+          showAutoReprompt={captureMode === "entities"}
+        />
+
+        {captureMode === "entities" && (
+          <>
+            <div className={styles.choiceHeaderRow}>
+              <Typography.Text className={styles.sectionHeading}>
+                Rules
+              </Typography.Text>
+              <Button
+                icon={<PlusOutlined />}
+                type="text"
+                onClick={addRule}
+                className={styles.choiceAddButton}
+              />
+            </div>
+            <div className={styles.choiceList}>
+              {localRules.length === 0 ? (
+                <div className={styles.captureEmptyState}>
+                  Add natural language guidance for the AI to validate captured
+                  entities.
+                </div>
+              ) : (
+                <div className={styles.rulesContainer}>
+                  {localRules.map((rule, index) => (
+                    <div key={`rule-${index}`} className={styles.ruleItem}>
+                      <Input.TextArea
+                        value={rule}
+                        onChange={(event) =>
+                          updateRuleLocal(index, event.target.value)
+                        }
+                        onBlur={() => commitRule(index)}
+                        autoSize={{ minRows: 1, maxRows: 4 }}
+                        placeholder={`Enter rule ${index + 1}...`}
+                        className={styles.ruleTextarea}
+                      />
+                      <Button
+                        type="text"
+                        icon={<MinusOutlined />}
+                        onClick={() => removeRule(index)}
+                        className={styles.ruleRemoveButton}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Divider className={styles.rulesSectionDivider} />
+
+            <div className={styles.choiceHeaderRow}>
+              <Typography.Text className={styles.sectionHeading}>
+                Exit scenarios
+              </Typography.Text>
+              <Button
+                icon={<PlusOutlined />}
+                type="text"
+                onClick={addExitScenario}
+                className={styles.choiceAddButton}
+              />
+            </div>
+            <div className={styles.choiceList}>
+              {localExitScenarios.length === 0 ? (
+                <div className={styles.captureEmptyState}>
+                  Document when the assistant should stop collecting entities.
+                </div>
+              ) : (
+                <div className={styles.rulesContainer}>
+                  {localExitScenarios.map((scenario, index) => (
+                    <div
+                      key={`exit-scenario-${index}`}
+                      className={styles.ruleItem}
+                    >
+                      <Input.TextArea
+                        value={scenario}
+                        onChange={(event) =>
+                          updateExitScenarioLocal(index, event.target.value)
+                        }
+                        onBlur={() => commitExitScenario(index)}
+                        autoSize={{ minRows: 1, maxRows: 4 }}
+                        placeholder={`Exit if...`}
+                        className={styles.ruleTextarea}
+                      />
+                      <Button
+                        type="text"
+                        icon={<MinusOutlined />}
+                        onClick={() => removeExitScenario(index)}
+                        className={styles.ruleRemoveButton}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className={styles.captureToggleCard}>
+              <div className={styles.captureToggleHeader}>
+                <div>
+                  <Popover
+                    trigger={["click"]}
+                    destroyTooltipOnHide
+                    placement="left"
+                    open={exitPathPopoverOpen}
+                    onOpenChange={(open) => {
+                      setExitPathPopoverOpen(open);
+                    }}
+                    content={
+                      <div style={{ width: "200px", padding: "4px" }}>
+                        <Typography.Text style={{ fontSize: "12px", color: "#666", marginBottom: "8px", display: "block" }}>
+                          Path label
+                        </Typography.Text>
+                        <Input
+                          autoFocus
+                          value={exitPathLabel}
+                          onChange={(event) => {
+                            const { value } = event.target;
+                            setExitPathLabel(value);
+                          }}
+                          onBlur={() => {
+                            handleUpdateNodeBatch({ exitPathLabel });
+                          }}
+                          placeholder="Enter exit path label"
+                          onPressEnter={() => {
+                            setExitPathPopoverOpen(false);
+                            handleUpdateNodeBatch({ exitPathLabel });
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") {
+                              setExitPathPopoverOpen(false);
+                            }
+                          }}
+                        />
+                      </div>
+                    }
+                  >
+                    <Typography.Text 
+                      className={styles.sectionHeading} 
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => setExitPathPopoverOpen(true)}
+                    >
+                      Exit scenario path
+                    </Typography.Text>
+                  </Popover>
+                </div>
+                <Switch checked={exitPathEnabled} onChange={toggleExitPath} />
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Entity Creation Modal */}
+        <Modal
+          title="Create entity"
+          open={entityCreationModalOpen}
+          onCancel={() => {
+            setEntityCreationModalOpen(false);
+            setNewEntityName("");
+            setEntityDataType("custom");
+            setEntityValues([""]);
+            setShowAllValues(false);
+          }}
+          onOk={handleCreateNewEntity}
+          okText="Create entity"
+          cancelText="Cancel"
+          okButtonProps={{
+            disabled:
+              !newEntityName.trim() ||
+              (entityDataType === "custom" &&
+                entityValues.every((v) => !v.trim())),
+          }}
+          destroyOnHidden
+          width={520}
+        >
+          <Form layout="vertical">
+            <Form.Item label="Name" required>
+              <Input
+                value={newEntityName}
+                onChange={(e) => setNewEntityName(e.target.value)}
+                placeholder="Enter entity name"
+                onPressEnter={handleCreateNewEntity}
+                autoFocus
+              />
+            </Form.Item>
+
+            <Form.Item label="Data type">
+              <Select
+                value={entityDataType}
+                onChange={setEntityDataType}
+                options={entityDataTypes}
+              />
+            </Form.Item>
+
+            {entityDataType === "custom" && (
+              <div>
+                <div className={styles.entityModalValuesHeader}>
+                  <span className={styles.entityModalValuesLabel}>
+                    Values{" "}
+                    <span className={styles.entityModalRequiredStar}>*</span>
+                  </span>
+                  <Space size="small">
+                    <Button
+                      type="default"
+                      size="small"
+                      icon={<InboxOutlined />}
+                      onClick={() => setBulkImportModalOpen(true)}
+                    />
+                    <Button
+                      type="default"
+                      size="small"
+                      icon={<PlusOutlined />}
+                      onClick={addEntityValueRow}
+                    />
+                  </Space>
+                </div>
+                <div className={styles.entityModalValuesContainer}>
+                  {(showAllValues
+                    ? entityValues
+                    : entityValues.slice(0, 8)
+                  ).map((entry, index) => (
+                    <div
+                      key={`entity-value-${index}`}
+                      className={styles.entityModalValueRow}
+                    >
+                      <Input
+                        className={styles.entityModalValueInput}
+                        value={entry}
+                        onChange={(event) =>
+                          handleEntityValueChange(index, event.target.value)
+                        }
+                        placeholder="Add synonyms, comma separated"
+                      />
+                      <Button
+                        type="text"
+                        icon={<MinusCircleOutlined />}
+                        onClick={() => removeEntityValueRow(index)}
+                        disabled={entityValues.length === 1}
+                      />
+                    </div>
+                  ))}
+                  {entityValues.length > 8 && (
+                    <div className={styles.entityModalToggleContainer}>
+                      <Button
+                        type="link"
+                        onClick={() => setShowAllValues(!showAllValues)}
+                        className={styles.entityModalToggleButton}
+                      >
+                        {showAllValues
+                          ? "Show less"
+                          : `Show all values (${entityValues.length})`}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <div className={styles.entityModalHelperText}>
+                  Add values and synonyms (comma separated)
+                </div>
+              </div>
+            )}
+          </Form>
+        </Modal>
+
+        {/* Bulk Import Modal */}
+        <Modal
+          title="Bulk import entity values"
+          open={bulkImportModalOpen}
+          onCancel={() => {
+            setBulkImportModalOpen(false);
+            setBulkImportText("");
+            setIsDragActive(false);
+          }}
+          onOk={handleBulkImport}
+          okText="Import"
+          cancelText="Close"
+          destroyOnHidden
+          width={520}
+          afterClose={() => {
+            setIsDragActive(false);
+          }}
+        >
+          <Form layout="vertical">
+            <Form.Item
+              label="Entity values"
+              extra="Format: value 1, synonym 1, 2, 3... One entity value per line."
+            >
+              <TextArea
+                value={bulkImportText}
+                onChange={(e) => setBulkImportText(e.target.value)}
+                placeholder={
+                  isDragActive
+                    ? "Drop CSV file here..."
+                    : "Enter values, or drop CSV here"
+                }
+                rows={8}
+                style={{
+                  resize: "vertical",
+                  border: isDragActive
+                    ? "2px dashed #1890ff"
+                    : "2px dashed #d9d9d9",
+                  backgroundColor: isDragActive ? "#f6ffed" : "transparent",
+                  borderRadius: "6px",
+                  transition: "all 0.3s ease",
+                }}
+                onDragOver={handleDragOver}
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              />
+            </Form.Item>
+          </Form>
+        </Modal>
+      </div>
+    );
+  };
 
   const MessageProperties = () => {
     const PROMPT_VARIANT_PREFIX = "__prompt__:";
@@ -3351,6 +5794,264 @@ export default function PropertiesPanel({
     );
   };
 
+  const ChoiceProperties = () => {
+    const rawChoices = selectedNode.data.choices as any[] | undefined;
+    const normalizedChoices = useMemo(
+      () => normalizeChoiceOptions(Array.isArray(rawChoices) ? rawChoices : []),
+      [rawChoices]
+    );
+    const initialChoices =
+      normalizedChoices.length > 0
+        ? normalizedChoices
+        : createDefaultChoiceList();
+    const [choicesState, setChoicesState] =
+      useState<ChoiceOption[]>(initialChoices);
+    const choicesRef = useRef<ChoiceOption[]>(initialChoices);
+    const [activeChoiceId, setActiveChoiceId] = useState<string | null>(null);
+    const [draftChoice, setDraftChoice] = useState<ChoiceOption | null>(null);
+
+    useEffect(() => {
+      const next =
+        normalizedChoices.length > 0
+          ? normalizedChoices
+          : createDefaultChoiceList();
+      if (!choicesEqual(next, choicesRef.current)) {
+        setChoicesState(next);
+      }
+      choicesRef.current = next;
+      setActiveChoiceId(null);
+      setDraftChoice(null);
+    }, [normalizedChoices, selectedNodeId]);
+
+    useEffect(() => {
+      choicesRef.current = choicesState;
+    }, [choicesState]);
+
+    const persistChoices = (next?: ChoiceOption[]) => {
+      const payload = next ?? choicesRef.current;
+      const sanitized = normalizeChoiceOptions(payload);
+      if (choicesEqual(sanitized, normalizedChoices)) {
+        return;
+      }
+      handleUpdateNode("choices", sanitized);
+    };
+
+    useEffect(() => {
+      return () => {
+        persistChoices();
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedNodeId]);
+
+    const updateChoice = (
+      id: string,
+      patch: Partial<ChoiceOption>,
+      options: { persist?: boolean } = {}
+    ) => {
+      setChoicesState((current) => {
+        const next = current.map((choice) =>
+          choice.id === id ? { ...choice, ...patch } : choice
+        );
+        choicesRef.current = next;
+        if (options.persist) {
+          persistChoices(next);
+        }
+        return next;
+      });
+    };
+
+    const addChoice = () => {
+      const newChoice: ChoiceOption = {
+        id: generateChoiceId(),
+        label: "",
+      };
+      const next = [...choicesRef.current, newChoice];
+      setChoicesState(next);
+      choicesRef.current = next;
+      persistChoices(next);
+      setActiveChoiceId(newChoice.id);
+      setDraftChoice({ ...newChoice });
+    };
+
+    const removeChoice = (id: string) => {
+      const next = choicesRef.current.filter((choice) => choice.id !== id);
+      setChoicesState(next);
+      choicesRef.current = next;
+      persistChoices(next);
+      if (activeChoiceId === id) {
+        setActiveChoiceId(null);
+        setDraftChoice(null);
+      }
+    };
+
+    const closePopover = useCallback(() => {
+      setActiveChoiceId(null);
+      setDraftChoice(null);
+    }, []);
+
+    const saveDraftChoice = () => {
+      if (!draftChoice) return;
+      const trimmedIntent = (draftChoice.intent || "").trim();
+      const trimmedButton = (draftChoice.buttonLabel || "").trim();
+      updateChoice(
+        draftChoice.id,
+        {
+          label: trimmedIntent.length > 0 ? trimmedIntent : "",
+          intent: trimmedIntent || undefined,
+          buttonLabel: trimmedButton.length > 0 ? trimmedButton : undefined,
+        },
+        { persist: true }
+      );
+      closePopover();
+    };
+
+    return (
+      <div className={styles.choiceProperties}>
+        <div className={styles.choiceHeaderRow}>
+          <Typography.Text className={styles.sectionHeading}>
+            Triggers
+          </Typography.Text>
+          <Button
+            icon={<PlusOutlined />}
+            type="text"
+            onClick={addChoice}
+            className={styles.choiceAddButton}
+          />
+        </div>
+        <div className={styles.choiceList}>
+          {choicesState.length === 0 ? (
+            <div
+              className={`${styles.choiceListItem} ${styles.choiceListItemEmpty}`}
+            >
+              <span className={styles.choiceEmptyLabel}>None</span>
+            </div>
+          ) : (
+            choicesState.map((choice) => {
+              const isActive = activeChoiceId === choice.id;
+              const effectiveChoice =
+                isActive && draftChoice ? draftChoice : choice;
+              const summaryIntent = (effectiveChoice.intent || "").trim();
+              const summaryLabel = (effectiveChoice.label || "").trim();
+              const summaryDisplay =
+                summaryIntent.length > 0
+                  ? summaryIntent
+                  : summaryLabel.length > 0
+                  ? summaryLabel
+                  : "Select intent";
+              const isPlaceholder =
+                summaryIntent.length === 0 && summaryLabel.length === 0;
+              return (
+                <div
+                  key={choice.id}
+                  className={`${styles.choiceListItem} ${
+                    isActive ? styles.choiceListItemActive : ""
+                  }`}
+                >
+                  <Popover
+                    trigger="click"
+                    open={isActive}
+                    onOpenChange={(open) => {
+                      if (open) {
+                        setActiveChoiceId(choice.id);
+                        setDraftChoice({ ...choice });
+                      } else {
+                        closePopover();
+                      }
+                    }}
+                    placement="right"
+                    overlayClassName={styles.choicePopoverOverlay}
+                    content={
+                      <div className={styles.choicePopover}>
+                        <Typography.Text className={styles.choicePopoverTitle}>
+                          Choice settings
+                        </Typography.Text>
+                        <Form layout="vertical">
+                          <Form.Item label="Intent">
+                            <IntentPicker
+                              value={effectiveChoice.intent || ""}
+                              onChange={(nextIntent) => {
+                                setDraftChoice((current) => {
+                                  if (!current || current.id !== choice.id)
+                                    return current;
+                                  return {
+                                    ...current,
+                                    intent: nextIntent,
+                                    label:
+                                      typeof nextIntent === "string"
+                                        ? nextIntent.trim()
+                                        : "",
+                                  };
+                                });
+                              }}
+                              placeholder="Select or create intent"
+                              allowCreate
+                              allowClear
+                              createMode="modal"
+                              size="middle"
+                            />
+                          </Form.Item>
+                          <Form.Item label="Button label">
+                            <Input
+                              value={effectiveChoice.buttonLabel || ""}
+                              onChange={(event) => {
+                                const nextValue = event.target.value;
+                                setDraftChoice((current) => {
+                                  if (!current || current.id !== choice.id)
+                                    return current;
+                                  return {
+                                    ...current,
+                                    buttonLabel: nextValue,
+                                  };
+                                });
+                              }}
+                              placeholder="Optional button label"
+                            />
+                          </Form.Item>
+                        </Form>
+                        <div className={styles.choicePopoverFooter}>
+                          <Button onClick={closePopover}>Cancel</Button>
+                          <Button type="primary" onClick={saveDraftChoice}>
+                            Save
+                          </Button>
+                        </div>
+                      </div>
+                    }
+                  >
+                    <button type="button" className={styles.choiceListTrigger}>
+                      <span
+                        className={`${styles.choiceListTriggerText} ${
+                          isPlaceholder
+                            ? styles.choiceListTriggerPlaceholder
+                            : ""
+                        }`}
+                      >
+                        {summaryDisplay}
+                      </span>
+                    </button>
+                  </Popover>
+                  <div className={styles.choiceItemActions}>
+                    <Button
+                      type="text"
+                      icon={<MinusOutlined />}
+                      onClick={() => removeChoice(choice.id)}
+                      className={styles.choiceRemoveButton}
+                    />
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+        <Divider className={styles.choiceDivider} />
+        <FallbackSettings
+          selectedNode={selectedNode}
+          selectedNodeId={selectedNodeId}
+          handleUpdateNodeBatch={handleUpdateNodeBatch}
+        />
+      </div>
+    );
+  };
+
   const ButtonsProperties = () => {
     const rawButtons = selectedNode.data.buttons as
       | ButtonsNodeButton[]
@@ -3480,22 +6181,21 @@ export default function PropertiesPanel({
       delete buttonLabelRefs.current[id];
     };
 
-    const handleButtonPopoverOpenChange =
-      (id: string) => (open: boolean) => {
-        setActiveButtonId((prev) => {
-          if (open) {
-            if (prev && prev !== id) {
-              persistButtons();
-            }
-            return id;
-          }
-          if (prev === id) {
+    const handleButtonPopoverOpenChange = (id: string) => (open: boolean) => {
+      setActiveButtonId((prev) => {
+        if (open) {
+          if (prev && prev !== id) {
             persistButtons();
-            return null;
           }
-          return prev;
-        });
-      };
+          return id;
+        }
+        if (prev === id) {
+          persistButtons();
+          return null;
+        }
+        return prev;
+      });
+    };
 
     const renderButtonEditor = (button: ButtonsNodeButton) => {
       const canRenderAddAnother = buttonsStateRef.current.length < 10;
@@ -3515,9 +6215,7 @@ export default function PropertiesPanel({
               }
             }}
             value={button.label}
-            onChange={(value) =>
-              updateButtonLocal(button.id, { label: value })
-            }
+            onChange={(value) => updateButtonLocal(button.id, { label: value })}
             onBlur={() => persistButtons()}
             onPressEnter={() => {
               persistButtons();
@@ -3540,485 +6238,6 @@ export default function PropertiesPanel({
         </div>
       );
     };
-
-    const rawNoMatch = selectedNode.data.noMatch as
-      | ButtonsFallbackConfig
-      | undefined;
-    const rawNoReply = selectedNode.data.noReply as
-      | ButtonsFallbackConfig
-      | undefined;
-    const listenForOtherTriggers = !!selectedNode.data.listenForOtherTriggers;
-
-    const [noMatchConfig, setNoMatchConfig] = useState<ButtonsFallbackConfig>(
-      ensureFallbackReprompts(normalizeFallbackConfig(rawNoMatch))
-    );
-    const [noReplyConfig, setNoReplyConfig] = useState<ButtonsFallbackConfig>(
-      ensureFallbackReprompts(
-        normalizeFallbackConfig(rawNoReply, { inactivityTimeout: 10 })
-      )
-    );
-    const [fallbackPopover, setFallbackPopover] = useState<
-      "noMatch" | "noReply" | null
-    >(null);
-    const [draftNoMatch, setDraftNoMatch] = useState<ButtonsFallbackConfig>(
-      ensureFallbackReprompts(normalizeFallbackConfig(rawNoMatch))
-    );
-    const [draftNoReply, setDraftNoReply] = useState<ButtonsFallbackConfig>(
-      ensureFallbackReprompts(
-        normalizeFallbackConfig(rawNoReply, { inactivityTimeout: 10 })
-      )
-    );
-    const repromptRefs = useRef<Record<number, RichTextEditorHandle | null>>(
-      {}
-    );
-    const [editingRepromptIndex, setEditingRepromptIndex] = useState<
-      number | null
-    >(null);
-    const [pathLabelPopover, setPathLabelPopover] = useState<
-      "noMatch" | "noReply" | null
-    >(null);
-
-    useEffect(() => {
-      setNoMatchConfig(
-        ensureFallbackReprompts(normalizeFallbackConfig(rawNoMatch))
-      );
-    }, [rawNoMatch, selectedNodeId]);
-
-    useEffect(() => {
-      setNoReplyConfig(
-        ensureFallbackReprompts(
-          normalizeFallbackConfig(rawNoReply, { inactivityTimeout: 10 })
-        )
-      );
-    }, [rawNoReply, selectedNodeId]);
-
-    useEffect(() => {
-      if (fallbackPopover !== "noMatch") {
-        setDraftNoMatch(ensureFallbackReprompts(noMatchConfig));
-      }
-    }, [noMatchConfig, fallbackPopover]);
-
-    useEffect(() => {
-      if (fallbackPopover !== "noReply") {
-        setDraftNoReply(ensureFallbackReprompts(noReplyConfig));
-      }
-    }, [noReplyConfig, fallbackPopover]);
-
-    useEffect(() => {
-      if (editingRepromptIndex === null) return;
-      const focusLater = () => {
-        const ref = repromptRefs.current[editingRepromptIndex];
-        ref?.focus?.();
-      };
-      const id = window.setTimeout(focusLater, 0);
-      return () => window.clearTimeout(id);
-    }, [editingRepromptIndex, fallbackPopover]);
-
-    useEffect(() => {
-      setFallbackPopover(null);
-    }, [selectedNodeId]);
-
-    useEffect(() => {
-      if (!fallbackPopover) {
-        setPathLabelPopover(null);
-      }
-    }, [fallbackPopover]);
-
-    const commitNoMatch = (next: ButtonsFallbackConfig) => {
-      setNoMatchConfig(next);
-      handleUpdateNodeBatch({ noMatch: next });
-    };
-
-    const commitNoReply = (next: ButtonsFallbackConfig) => {
-      setNoReplyConfig(next);
-      handleUpdateNodeBatch({ noReply: next });
-    };
-
-    const toggleNoMatch = (enabled: boolean) => {
-      const nextConfig: ButtonsFallbackConfig = {
-        ...noMatchConfig,
-        enabled,
-        reprompts:
-          enabled && noMatchConfig.reprompts.length === 0
-            ? [""]
-            : noMatchConfig.reprompts,
-      };
-      commitNoMatch(nextConfig);
-      setFallbackPopover((prev) =>
-        enabled ? "noMatch" : prev === "noMatch" ? null : prev
-      );
-      setDraftNoMatch(ensureFallbackReprompts(nextConfig));
-    };
-
-    const toggleNoReply = (enabled: boolean) => {
-      const nextConfig: ButtonsFallbackConfig = {
-        ...noReplyConfig,
-        enabled,
-        reprompts:
-          enabled && noReplyConfig.reprompts.length === 0
-            ? [""]
-            : noReplyConfig.reprompts,
-        inactivityTimeout:
-          typeof noReplyConfig.inactivityTimeout === "number"
-            ? noReplyConfig.inactivityTimeout
-            : 10,
-      };
-      commitNoReply(nextConfig);
-      setFallbackPopover((prev) =>
-        enabled ? "noReply" : prev === "noReply" ? null : prev
-      );
-      setDraftNoReply(ensureFallbackReprompts(nextConfig));
-    };
-
-    const renderRepromptEditor = (
-      draft: ButtonsFallbackConfig,
-      setDraft: React.Dispatch<React.SetStateAction<ButtonsFallbackConfig>>,
-      options: {
-        showInactivity?: boolean;
-        followPathLabel?: string;
-        context: "noMatch" | "noReply";
-      }
-    ) => {
-      const safeDraft = ensureFallbackReprompts(draft);
-
-      const updateDraft = (
-        updater: (current: ButtonsFallbackConfig) => ButtonsFallbackConfig
-      ) => {
-        setDraft((current) => {
-          const ensuredCurrent = ensureFallbackReprompts(current);
-          const next = ensureFallbackReprompts(updater(ensuredCurrent));
-          return next;
-        });
-      };
-
-      const handleAddReprompt = () => {
-        updateDraft((current) => ({
-          ...current,
-          reprompts: [...current.reprompts, ""],
-        }));
-      };
-
-      const handleGenerateReprompts = (count: number) => {
-        if (!Number.isFinite(count) || count <= 0) return;
-        updateDraft((current) => {
-          const ensuredCurrent = ensureFallbackReprompts(current);
-          let nextReprompts = ensuredCurrent.reprompts.slice(0, count);
-          if (nextReprompts.length < count) {
-            nextReprompts = [
-              ...nextReprompts,
-              ...Array(count - nextReprompts.length).fill(""),
-            ];
-          }
-          return {
-            ...ensuredCurrent,
-            reprompts: nextReprompts,
-          };
-        });
-        setEditingRepromptIndex(count - 1);
-      };
-
-      const handleRemoveReprompt = (index: number) => {
-        updateDraft((current) => {
-          const nextPrompts = current.reprompts.filter(
-            (_, idx) => idx !== index
-          );
-          return {
-            ...current,
-            reprompts: nextPrompts.length ? nextPrompts : [""],
-          };
-        });
-        setEditingRepromptIndex((current) => {
-          if (current === null) return current;
-          if (current === index) return null;
-          if (current > index) return current - 1;
-          return current;
-        });
-        delete repromptRefs.current[index];
-      };
-
-      return (
-        <div className={styles.buttonsFallbackCard}>
-          {options?.showInactivity && (
-            <div className={styles.buttonsFallbackFieldRow}>
-              <div className={styles.buttonsFallbackFieldLabel}>
-                Inactivity time (sec)
-              </div>
-              <InputNumber
-                min={1}
-                value={safeDraft.inactivityTimeout || 10}
-                onChange={(value) =>
-                  updateDraft((current) => ({
-                    ...current,
-                    inactivityTimeout:
-                      typeof value === "number"
-                        ? value
-                        : current.inactivityTimeout,
-                  }))
-                }
-              />
-            </div>
-          )}
-          <Typography.Text className={styles.buttonsFallbackCardTitle}>
-            Reprompts
-          </Typography.Text>
-          <div className={styles.buttonsRepromptList}>
-            {safeDraft.reprompts.map((reprompt, index) => {
-              const isEditing = editingRepromptIndex === index;
-
-              return (
-                <div key={index} className={styles.buttonsRepromptRow}>
-                  <div className={styles.buttonsRepromptEditor}>
-                    {isEditing ? (
-                      <RichTextEditor
-                        ref={(instance) => {
-                          if (instance) {
-                            repromptRefs.current[index] = instance;
-                          } else {
-                            delete repromptRefs.current[index];
-                          }
-                        }}
-                        value={reprompt}
-                        onChange={(value) =>
-                          updateDraft((current) => {
-                            const nextPrompts = [...current.reprompts];
-                            nextPrompts[index] = value;
-                            return {
-                              ...current,
-                              reprompts: nextPrompts,
-                            };
-                          })
-                        }
-                        placeholder={`Enter reprompt ${index + 1}`}
-                        className={styles.buttonsRichEditor}
-                        onBlur={() => {
-                          window.setTimeout(() => {
-                            setEditingRepromptIndex((current) =>
-                              current === index ? null : current
-                            );
-                          }, 150);
-                        }}
-                      />
-                    ) : (
-                      <div
-                        className={styles.buttonsRepromptPreview}
-                        onClick={() => {
-                          setEditingRepromptIndex(index);
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            setEditingRepromptIndex(index);
-                          }
-                        }}
-                        dangerouslySetInnerHTML={{
-                          __html: reprompt.trim().length
-                            ? renderFormattedReprompt(reprompt)
-                            : `<span class="placeholder">Enter reprompt ${
-                                index + 1
-                              }</span>`,
-                        }}
-                      />
-                    )}
-                  </div>
-                  <Button
-                    type="text"
-                    icon={<MinusOutlined />}
-                    className={styles.buttonsRepromptRemove}
-                    onClick={() => handleRemoveReprompt(index)}
-                    disabled={safeDraft.reprompts.length <= 1}
-                  />
-                </div>
-              );
-            })}
-          </div>
-          <div className={styles.buttonsRepromptActions}>
-            <Dropdown
-              trigger={["click"]}
-              overlayClassName={styles.buttonsRepromptGenerateMenu}
-              menu={{
-                items: [
-                  { key: "1", label: "Generate 1 variant" },
-                  { key: "3", label: "Generate 3 variants" },
-                  { key: "5", label: "Generate 5 variants" },
-                ],
-                onClick: ({ key }) => {
-                  const parsed = Number.parseInt(key, 10);
-                  handleGenerateReprompts(Number.isNaN(parsed) ? 0 : parsed);
-                },
-              }}
-            >
-              <Button className={styles.buttonsRepromptGenerate}>
-                <span className={styles.buttonsRepromptGenerateIcon}>✨</span>
-                Generate
-                <DownOutlined className={styles.buttonsRepromptGenerateCaret} />
-              </Button>
-            </Dropdown>
-            <Button
-              type="dashed"
-              icon={<PlusOutlined />}
-              onClick={handleAddReprompt}
-              className={styles.buttonsRepromptAdd}
-            >
-              Add reprompt
-            </Button>
-          </div>
-          <div className={styles.buttonsFollowPathRow}>
-            <span className={styles.buttonsFollowPathLabel}>
-              Follow path after reprompts?
-            </span>
-            <Switch
-              checked={!!safeDraft.followPath}
-              onChange={(checked) => {
-                updateDraft((current) => {
-                  const ensuredCurrent = ensureFallbackReprompts(current);
-                  return {
-                    ...ensuredCurrent,
-                    followPath: checked,
-                    pathLabel: checked
-                      ? ensuredCurrent.pathLabel?.trim()
-                        ? ensuredCurrent.pathLabel
-                        : options.followPathLabel || ""
-                      : ensuredCurrent.pathLabel,
-                  };
-                });
-                setPathLabelPopover((current) => {
-                  if (checked) {
-                    return options.context;
-                  }
-                  return current === options.context ? null : current;
-                });
-              }}
-            />
-          </div>
-          {safeDraft.followPath && (
-            <Popover
-              trigger={["click"]}
-              destroyTooltipOnHide
-              placement="left"
-              overlayClassName={styles.buttonsPathLabelPopover}
-              open={pathLabelPopover === options.context}
-              onOpenChange={(open) => {
-                setPathLabelPopover((current) => {
-                  if (open) {
-                    return options.context;
-                  }
-                  return current === options.context ? null : current;
-                });
-              }}
-              content={
-                <div className={styles.buttonsPathLabelPopoverContent}>
-                  <Typography.Text className={styles.buttonsPathLabelPopoverTitle}>
-                    Path label
-                  </Typography.Text>
-                  <Input
-                    autoFocus
-                    value={safeDraft.pathLabel || ""}
-                    onChange={(event) => {
-                      const { value } = event.target;
-                      updateDraft((current) => ({
-                        ...ensureFallbackReprompts(current),
-                        pathLabel: value,
-                      }));
-                    }}
-                    placeholder={
-                      options.followPathLabel ||
-                      `Enter ${options.context === "noMatch" ? "no match" : "no reply"} label`
-                    }
-                    className={styles.buttonsPathLabelInput}
-                    onPressEnter={() =>
-                      setPathLabelPopover((current) =>
-                        current === options.context ? null : current
-                      )
-                    }
-                  />
-                  <Button
-                    type="primary"
-                    className={styles.buttonsPathLabelDone}
-                    onClick={() =>
-                      setPathLabelPopover((current) =>
-                        current === options.context ? null : current
-                      )
-                    }
-                  >
-                    Done
-                  </Button>
-                </div>
-              }
-            >
-              <button
-                type="button"
-                className={styles.buttonsPathLabelTrigger}
-              >
-                <span className={styles.buttonsPathLabelTriggerTitle}>
-                  Path label
-                </span>
-                <span className={styles.buttonsPathLabelTriggerValue}>
-                  {safeDraft.pathLabel?.trim() ||
-                    options.followPathLabel ||
-                    `Enter ${options.context === "noMatch" ? "no match" : "no reply"} label`}
-                </span>
-              </button>
-            </Popover>
-          )}
-        </div>
-      );
-    };
-
-    const handleFallbackOpenChange =
-      (key: "noMatch" | "noReply") => (visible: boolean) => {
-        setFallbackPopover((prev) => {
-          if (visible) {
-            if (prev && prev !== key) {
-              commitDraftConfig(prev);
-            }
-            if (key === "noMatch") {
-              setDraftNoMatch(ensureFallbackReprompts(noMatchConfig));
-            } else {
-              setDraftNoReply(ensureFallbackReprompts(noReplyConfig));
-            }
-            setPathLabelPopover(null);
-            return key;
-          }
-          commitDraftConfig(key);
-          setPathLabelPopover((current) =>
-            current === key ? null : current
-          );
-          return prev === key ? null : prev;
-        });
-      };
-
-    const setListenForOtherTriggers = (checked: boolean) => {
-      handleUpdateNodeBatch({ listenForOtherTriggers: checked });
-    };
-
-    const commitDraftConfig = useCallback(
-      (key: "noMatch" | "noReply") => {
-        if (key === "noMatch") {
-          const ensured = ensureFallbackReprompts(draftNoMatch);
-          if (!fallbackConfigsEqual(ensured, noMatchConfig)) {
-            commitNoMatch(ensured);
-          }
-          setDraftNoMatch(ensured);
-        } else {
-          const ensured = ensureFallbackReprompts(draftNoReply);
-          if (!fallbackConfigsEqual(ensured, noReplyConfig)) {
-            commitNoReply(ensured);
-          }
-          setDraftNoReply(ensured);
-        }
-        setEditingRepromptIndex(null);
-      },
-      [
-        draftNoMatch,
-        draftNoReply,
-        noMatchConfig,
-        noReplyConfig,
-        commitNoMatch,
-        commitNoReply,
-      ]
-    );
 
     return (
       <div className={styles.buttonsNodeProperties}>
@@ -4059,7 +6278,9 @@ export default function PropertiesPanel({
                   className={`${styles.buttonsNodeListItem} ${
                     isActive ? styles.buttonsNodeListItemActive : ""
                   } ${
-                    button.label.trim() ? "" : styles.buttonsNodeListItemInactive
+                    button.label.trim()
+                      ? ""
+                      : styles.buttonsNodeListItemInactive
                   }`}
                 >
                   <span className={styles.buttonsNodeListLabel}>
@@ -4083,105 +6304,11 @@ export default function PropertiesPanel({
 
         <Divider className={styles.buttonsNodeDivider} />
 
-        <Typography.Text className={styles.sectionHeading}>
-          Fallbacks
-        </Typography.Text>
-        <div className={styles.buttonsFallbackList}>
-          <Popover
-            trigger={["click"]}
-            destroyOnHidden
-            placement="left"
-            overlayClassName={styles.buttonsFallbackPopover}
-            open={fallbackPopover === "noMatch"}
-            onOpenChange={handleFallbackOpenChange("noMatch")}
-            content={renderRepromptEditor(draftNoMatch, setDraftNoMatch, {
-              context: "noMatch",
-              followPathLabel: "No match",
-            })}
-          >
-            <div
-              className={`${styles.buttonsFallbackItem} ${
-                fallbackPopover === "noMatch"
-                  ? styles.buttonsFallbackItemActive
-                  : ""
-              } ${
-                !noMatchConfig.enabled && fallbackPopover !== "noMatch"
-                  ? styles.buttonsFallbackItemInactive
-                  : ""
-              }`}
-            >
-              <span className={styles.buttonsFallbackItemLabel}>No match</span>
-              <span
-                className={styles.buttonsFallbackSwitch}
-                onClick={(event) => event.stopPropagation()}
-                onMouseDown={(event) => event.stopPropagation()}
-              >
-                <Switch
-                  checked={!!noMatchConfig.enabled}
-                  onChange={toggleNoMatch}
-                />
-              </span>
-            </div>
-          </Popover>
-
-          <Popover
-            trigger={["click"]}
-            destroyOnHidden
-            placement="left"
-            overlayClassName={styles.buttonsFallbackPopover}
-            open={fallbackPopover === "noReply"}
-            onOpenChange={handleFallbackOpenChange("noReply")}
-            content={renderRepromptEditor(draftNoReply, setDraftNoReply, {
-              showInactivity: true,
-              context: "noReply",
-              followPathLabel: "No reply",
-            })}
-          >
-            <div
-              className={`${styles.buttonsFallbackItem} ${
-                fallbackPopover === "noReply"
-                  ? styles.buttonsFallbackItemActive
-                  : ""
-              } ${
-                !noReplyConfig.enabled && fallbackPopover !== "noReply"
-                  ? styles.buttonsFallbackItemInactive
-                  : ""
-              }`}
-            >
-              <span className={styles.buttonsFallbackItemLabel}>No reply</span>
-              <span
-                className={styles.buttonsFallbackSwitch}
-                onClick={(event) => event.stopPropagation()}
-                onMouseDown={(event) => event.stopPropagation()}
-              >
-                <Switch
-                  checked={!!noReplyConfig.enabled}
-                  onChange={toggleNoReply}
-                />
-              </span>
-            </div>
-          </Popover>
-
-          <div
-            className={`${styles.buttonsFallbackItem} ${
-              !listenForOtherTriggers ? styles.buttonsFallbackItemInactive : ""
-            } ${styles.buttonsFallbackItemStatic}`}
-          >
-            <span className={styles.buttonsFallbackItemLabel}>
-              Listen for other triggers
-            </span>
-            <span
-              className={styles.buttonsFallbackSwitch}
-              onClick={(event) => event.stopPropagation()}
-              onMouseDown={(event) => event.stopPropagation()}
-            >
-              <Switch
-                checked={listenForOtherTriggers}
-                onChange={setListenForOtherTriggers}
-              />
-            </span>
-          </div>
-        </div>
+        <FallbackSettings
+          selectedNode={selectedNode}
+          selectedNodeId={selectedNodeId}
+          handleUpdateNodeBatch={handleUpdateNodeBatch}
+        />
       </div>
     );
   };
@@ -4394,6 +6521,8 @@ export default function PropertiesPanel({
     switch (selectedNode.type) {
       case "start":
         return <StartProperties />;
+      case "capture":
+        return <CaptureProperties />;
       case "message":
         return <MessageProperties />;
       case "prompt":
@@ -4404,6 +6533,8 @@ export default function PropertiesPanel({
         return <EmailProperties />;
       case "set":
         return <SetProperties />;
+      case "choice":
+        return <ChoiceProperties />;
       case "buttons":
         return <ButtonsProperties />;
       case "card":
@@ -4435,6 +6566,8 @@ export default function PropertiesPanel({
   const blockColor =
     selectedNode.type === "start"
       ? "#22c55e"
+      : selectedNode.type === "capture"
+      ? "#8b5cf6"
       : selectedNode.type === "message"
       ? "#1677ff"
       : selectedNode.type === "prompt"
