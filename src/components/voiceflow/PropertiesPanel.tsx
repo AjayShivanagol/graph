@@ -29,6 +29,12 @@ import {
   BranchesOutlined,
   ToolOutlined,
   AppstoreOutlined,
+  MinusCircleOutlined,
+  InboxOutlined,
+  CrownOutlined,
+  ThunderboltOutlined,
+  RocketOutlined,
+  StarOutlined,
 } from "@ant-design/icons";
 import {
   Typography,
@@ -45,7 +51,10 @@ import {
   Divider,
   Space,
   Tooltip,
+  Modal,
+  Slider,
 } from "antd";
+const { TextArea } = Input;
 import type { MenuProps } from "antd";
 import Editor from "@monaco-editor/react";
 import VariablePicker from "../common/VariablePicker";
@@ -69,6 +78,36 @@ import {
   addNode,
 } from "../../store/slices/workflowSlice";
 import { showToast } from "../../store/slices/uiSlice";
+import { addEntity, addEntityDetailed } from "../../store/slices/entitiesSlice";
+
+// AI Models configuration
+const AI_MODELS = [
+  {
+    value: "claude-4-sonnet",
+    label: "Claude 4 - Sonnet",
+    icon: <CrownOutlined style={{ color: "#ff6b35" }} />,
+  },
+  {
+    value: "gpt-4o",
+    label: "GPT-4o",
+    icon: <ThunderboltOutlined style={{ color: "#10b981" }} />,
+  },
+  {
+    value: "gpt-4-turbo",
+    label: "GPT-4 Turbo",
+    icon: <RocketOutlined style={{ color: "#3b82f6" }} />,
+  },
+  {
+    value: "claude-3-opus",
+    label: "Claude 3 - Opus",
+    icon: <StarOutlined style={{ color: "#8b5cf6" }} />,
+  },
+  {
+    value: "claude-3-sonnet",
+    label: "Claude 3 - Sonnet",
+    icon: <StarOutlined style={{ color: "#06b6d4" }} />,
+  },
+];
 
 type ImageSourceType = "upload" | "link";
 
@@ -122,18 +161,23 @@ interface CaptureEntityConfig {
 interface CaptureNoReplyConfig {
   enabled: boolean;
   timeout: number;
-  prompt: string;
+  reprompts: string[];
+  followPath?: boolean;
+  pathLabel?: string;
 }
 
 interface CaptureAutoRepromptConfig {
   enabled: boolean;
+  model: string;
   temperature: number;
   maxTokens: number;
   systemPrompt: string;
 }
 
 const generateCaptureEntityId = () =>
-  `capture-entity-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}`;
+  `capture-entity-${Math.random()
+    .toString(36)
+    .slice(2, 8)}-${Date.now().toString(36)}`;
 
 const ensureCaptureEntity = (
   entry: any,
@@ -180,7 +224,10 @@ const ensureNoReplyConfig = (input: any): CaptureNoReplyConfig => {
   return {
     enabled: !!input?.enabled,
     timeout: timeout > 0 ? timeout : 10,
-    prompt: typeof input?.prompt === "string" ? input.prompt : "",
+    reprompts: Array.isArray(input?.reprompts) ? input.reprompts : [""],
+    followPath:
+      typeof input?.followPath === "boolean" ? input.followPath : false,
+    pathLabel: typeof input?.pathLabel === "string" ? input.pathLabel : "",
   };
 };
 
@@ -194,6 +241,7 @@ const ensureAutoRepromptConfig = (input: any): CaptureAutoRepromptConfig => {
 
   return {
     enabled: !!input?.enabled,
+    model: typeof input?.model === "string" ? input.model : "claude-4-sonnet",
     temperature: Math.min(Math.max(temperature, 0), 2),
     maxTokens: Math.max(Math.floor(maxTokens), 1),
     systemPrompt:
@@ -214,11 +262,14 @@ const serializeCaptureEntities = (
 const serializeNoReplyConfig = (config: CaptureNoReplyConfig) => ({
   enabled: !!config.enabled,
   timeout: Math.max(Math.floor(config.timeout) || 1, 1),
-  prompt: config.prompt,
+  reprompts: config.reprompts,
+  followPath: config.followPath,
+  pathLabel: config.pathLabel,
 });
 
 const serializeAutoRepromptConfig = (config: CaptureAutoRepromptConfig) => ({
   enabled: !!config.enabled,
+  model: config.model,
   temperature: Number(config.temperature.toFixed(2)),
   maxTokens: Math.max(Math.floor(config.maxTokens) || 1, 1),
   systemPrompt: config.systemPrompt,
@@ -227,13 +278,19 @@ const serializeAutoRepromptConfig = (config: CaptureAutoRepromptConfig) => ({
 const captureNoReplyEqual = (
   a: CaptureNoReplyConfig,
   b: CaptureNoReplyConfig
-) => a.enabled === b.enabled && a.timeout === b.timeout && a.prompt === b.prompt;
+) =>
+  a.enabled === b.enabled &&
+  a.timeout === b.timeout &&
+  JSON.stringify(a.reprompts) === JSON.stringify(b.reprompts) &&
+  a.followPath === b.followPath &&
+  a.pathLabel === b.pathLabel;
 
 const captureAutoRepromptEqual = (
   a: CaptureAutoRepromptConfig,
   b: CaptureAutoRepromptConfig
 ) =>
   a.enabled === b.enabled &&
+  a.model === b.model &&
   Number(a.temperature.toFixed(2)) === Number(b.temperature.toFixed(2)) &&
   a.maxTokens === b.maxTokens &&
   a.systemPrompt === b.systemPrompt;
@@ -293,7 +350,8 @@ const ensureChoiceOption = (choice: any, index: number): ChoiceOption => {
     id: typeof choice.id === "string" ? choice.id : fallbackId,
     label: typeof rawLabel === "string" ? rawLabel : "",
     intent: typeof rawIntent === "string" ? rawIntent : undefined,
-    buttonLabel: typeof rawButtonLabel === "string" ? rawButtonLabel : undefined,
+    buttonLabel:
+      typeof rawButtonLabel === "string" ? rawButtonLabel : undefined,
   };
 };
 
@@ -349,10 +407,7 @@ const createDefaultChoiceList = (): ChoiceOption[] => [
   },
 ];
 
-const buttonsEqual = (
-  a: ButtonsNodeButton[],
-  b: ButtonsNodeButton[]
-) => {
+const buttonsEqual = (a: ButtonsNodeButton[], b: ButtonsNodeButton[]) => {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i += 1) {
     const btnA = a[i];
@@ -617,9 +672,7 @@ const FallbackSettings: React.FC<FallbackSettingsProps> = ({
 
     const handleRemoveReprompt = (index: number) => {
       updateDraft((current) => {
-        const nextPrompts = current.reprompts.filter(
-          (_, idx) => idx !== index
-        );
+        const nextPrompts = current.reprompts.filter((_, idx) => idx !== index);
         return {
           ...current,
           reprompts: nextPrompts.length ? nextPrompts : [""],
@@ -807,7 +860,9 @@ const FallbackSettings: React.FC<FallbackSettingsProps> = ({
             }}
             content={
               <div className={styles.buttonsPathLabelPopoverContent}>
-                <Typography.Text className={styles.buttonsPathLabelPopoverTitle}>
+                <Typography.Text
+                  className={styles.buttonsPathLabelPopoverTitle}
+                >
                   Path label
                 </Typography.Text>
                 <Input
@@ -847,10 +902,7 @@ const FallbackSettings: React.FC<FallbackSettingsProps> = ({
               </div>
             }
           >
-            <button
-              type="button"
-              className={styles.buttonsPathLabelTrigger}
-            >
+            <button type="button" className={styles.buttonsPathLabelTrigger}>
               <span className={styles.buttonsPathLabelTriggerTitle}>
                 Path label
               </span>
@@ -884,9 +936,7 @@ const FallbackSettings: React.FC<FallbackSettingsProps> = ({
           return key;
         }
         commitDraftConfig(key);
-        setPathLabelPopover((current) =>
-          current === key ? null : current
-        );
+        setPathLabelPopover((current) => (current === key ? null : current));
         return prev === key ? null : prev;
       });
     };
@@ -957,7 +1007,10 @@ const FallbackSettings: React.FC<FallbackSettingsProps> = ({
               onClick={(event) => event.stopPropagation()}
               onMouseDown={(event) => event.stopPropagation()}
             >
-              <Switch checked={!!noMatchConfig.enabled} onChange={toggleNoMatch} />
+              <Switch
+                checked={!!noMatchConfig.enabled}
+                onChange={toggleNoMatch}
+              />
             </span>
           </div>
         </Popover>
@@ -992,7 +1045,10 @@ const FallbackSettings: React.FC<FallbackSettingsProps> = ({
               onClick={(event) => event.stopPropagation()}
               onMouseDown={(event) => event.stopPropagation()}
             >
-              <Switch checked={!!noReplyConfig.enabled} onChange={toggleNoReply} />
+              <Switch
+                checked={!!noReplyConfig.enabled}
+                onChange={toggleNoReply}
+              />
             </span>
           </div>
         </Popover>
@@ -1047,9 +1103,14 @@ const CaptureFallbackSettings: React.FC<CaptureFallbackSettingsProps> = ({
     ensureNoReplyConfig(noReply)
   );
   const [draftAutoReprompt, setDraftAutoReprompt] =
-    useState<CaptureAutoRepromptConfig>(
-      ensureAutoRepromptConfig(autoReprompt)
-    );
+    useState<CaptureAutoRepromptConfig>(ensureAutoRepromptConfig(autoReprompt));
+  const [editingRepromptIndex, setEditingRepromptIndex] = useState<
+    number | null
+  >(null);
+  const repromptRefs = useRef<Record<number, RichTextEditorHandle | null>>({});
+  const [pathLabelPopover, setPathLabelPopover] = useState<
+    "noReply" | "autoReprompt" | null
+  >(null);
 
   useEffect(() => {
     if (activePopover !== "noReply") {
@@ -1068,6 +1129,14 @@ const CaptureFallbackSettings: React.FC<CaptureFallbackSettingsProps> = ({
       setActivePopover(null);
     }
   }, [showAutoReprompt, activePopover]);
+
+  useEffect(() => {
+    if (editingRepromptIndex === null) return;
+    window.setTimeout(() => {
+      const ref = repromptRefs.current[editingRepromptIndex];
+      if (ref) ref.focus();
+    }, 100);
+  }, [editingRepromptIndex, activePopover]);
 
   const commitDraft = useCallback(
     (key: "noReply" | "autoReprompt") => {
@@ -1121,6 +1190,8 @@ const CaptureFallbackSettings: React.FC<CaptureFallbackSettingsProps> = ({
           return key;
         }
         commitDraft(key);
+        setEditingRepromptIndex(null);
+        setPathLabelPopover((current) => (current === key ? null : current));
         return current === key ? null : current;
       });
     },
@@ -1194,24 +1265,250 @@ const CaptureFallbackSettings: React.FC<CaptureFallbackSettingsProps> = ({
                   }}
                 />
               </div>
-              <div className={styles.captureFallbackFieldGroup}>
-                <div className={styles.buttonsFallbackFieldLabel}>
-                  Reprompt message
-                </div>
-                <Input.TextArea
-                  value={draftNoReply.prompt}
-                  autoSize={{ minRows: 2, maxRows: 6 }}
-                  placeholder="Enter reprompt"
-                  onChange={(event) => {
-                    const { value } = event.target;
+              <Typography.Text className={styles.buttonsFallbackCardTitle}>
+                Reprompts
+              </Typography.Text>
+              <div className={styles.buttonsRepromptList}>
+                {draftNoReply.reprompts.map((reprompt, index) => {
+                  const isEditing = editingRepromptIndex === index;
+
+                  return (
+                    <div key={index} className={styles.buttonsRepromptRow}>
+                      <div className={styles.buttonsRepromptEditor}>
+                        {isEditing ? (
+                          <RichTextEditor
+                            ref={(instance) => {
+                              if (instance) {
+                                repromptRefs.current[index] = instance;
+                              } else {
+                                delete repromptRefs.current[index];
+                              }
+                            }}
+                            value={reprompt}
+                            onChange={(value) => {
+                              setDraftNoReply((current) => {
+                                const nextReprompts = [...current.reprompts];
+                                nextReprompts[index] = value;
+                                return {
+                                  ...current,
+                                  reprompts: nextReprompts,
+                                };
+                              });
+                            }}
+                            placeholder={`Enter reprompt ${index + 1}`}
+                            className={styles.buttonsRichEditor}
+                            onBlur={() => {
+                              window.setTimeout(() => {
+                                setEditingRepromptIndex((current) =>
+                                  current === index ? null : current
+                                );
+                              }, 150);
+                            }}
+                          />
+                        ) : (
+                          <div
+                            className={styles.buttonsRepromptPreview}
+                            onClick={() => {
+                              setEditingRepromptIndex(index);
+                            }}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                setEditingRepromptIndex(index);
+                              }
+                            }}
+                            dangerouslySetInnerHTML={{
+                              __html: reprompt.trim().length
+                                ? renderFormattedReprompt(reprompt)
+                                : `<span class="placeholder">Enter reprompt ${
+                                    index + 1
+                                  }</span>`,
+                            }}
+                          />
+                        )}
+                      </div>
+                      <Button
+                        type="text"
+                        icon={<MinusOutlined />}
+                        className={styles.buttonsRepromptRemove}
+                        onClick={() => {
+                          setDraftNoReply((current) => {
+                            const nextReprompts = current.reprompts.filter(
+                              (_, idx) => idx !== index
+                            );
+                            return {
+                              ...current,
+                              reprompts: nextReprompts.length
+                                ? nextReprompts
+                                : [""],
+                            };
+                          });
+                          setEditingRepromptIndex((current) => {
+                            if (current === null) return current;
+                            if (current === index) return null;
+                            if (current > index) return current - 1;
+                            return current;
+                          });
+                          delete repromptRefs.current[index];
+                        }}
+                        disabled={draftNoReply.reprompts.length <= 1}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              <div className={styles.buttonsRepromptActions}>
+                <Dropdown
+                  trigger={["click"]}
+                  overlayClassName={styles.buttonsRepromptGenerateMenu}
+                  menu={{
+                    items: [
+                      { key: "1", label: "Generate 1 variant" },
+                      { key: "3", label: "Generate 3 variants" },
+                      { key: "5", label: "Generate 5 variants" },
+                    ],
+                    onClick: ({ key }) => {
+                      const count = Number.parseInt(key, 10);
+                      if (!Number.isFinite(count) || count <= 0) return;
+                      setDraftNoReply((current) => {
+                        let nextReprompts = current.reprompts.slice(0, count);
+                        if (nextReprompts.length < count) {
+                          nextReprompts = [
+                            ...nextReprompts,
+                            ...Array(count - nextReprompts.length).fill(""),
+                          ];
+                        }
+                        return {
+                          ...current,
+                          reprompts: nextReprompts,
+                        };
+                      });
+                      setEditingRepromptIndex(count - 1);
+                    },
+                  }}
+                >
+                  <Button className={styles.buttonsRepromptGenerate}>
+                    <span className={styles.buttonsRepromptGenerateIcon}>
+                      ✨
+                    </span>
+                    Generate
+                    <DownOutlined
+                      className={styles.buttonsRepromptGenerateCaret}
+                    />
+                  </Button>
+                </Dropdown>
+                <Button
+                  type="dashed"
+                  icon={<PlusOutlined />}
+                  onClick={() => {
+                    setDraftNoReply((current) => {
+                      const newIndex = current.reprompts.length;
+                      setEditingRepromptIndex(newIndex);
+                      return {
+                        ...current,
+                        reprompts: [...current.reprompts, ""],
+                      };
+                    });
+                  }}
+                  className={styles.buttonsRepromptAdd}
+                >
+                  Add reprompt
+                </Button>
+              </div>
+              <div className={styles.buttonsFollowPathRow}>
+                <span className={styles.buttonsFollowPathLabel}>
+                  Follow path after reprompts?
+                </span>
+                <Switch
+                  checked={!!draftNoReply.followPath}
+                  onChange={(checked) => {
                     setDraftNoReply((current) => ({
                       ...current,
-                      prompt: value,
+                      followPath: checked,
+                      pathLabel: checked
+                        ? current.pathLabel?.trim()
+                          ? current.pathLabel
+                          : "No reply"
+                        : current.pathLabel,
                     }));
+                    setPathLabelPopover((current) => {
+                      if (checked) {
+                        return "noReply";
+                      }
+                      return current === "noReply" ? null : current;
+                    });
                   }}
-                  className={styles.captureFallbackTextarea}
                 />
               </div>
+              {draftNoReply.followPath && (
+                <Popover
+                  trigger={["click"]}
+                  destroyTooltipOnHide
+                  placement="left"
+                  overlayClassName={styles.buttonsPathLabelPopover}
+                  open={pathLabelPopover === "noReply"}
+                  onOpenChange={(open) => {
+                    setPathLabelPopover((current) => {
+                      if (open) {
+                        return "noReply";
+                      }
+                      return current === "noReply" ? null : current;
+                    });
+                  }}
+                  content={
+                    <div className={styles.buttonsPathLabelPopoverContent}>
+                      <Typography.Text
+                        className={styles.buttonsPathLabelPopoverTitle}
+                      >
+                        Path label
+                      </Typography.Text>
+                      <Input
+                        autoFocus
+                        value={draftNoReply.pathLabel || ""}
+                        onChange={(event) => {
+                          const { value } = event.target;
+                          setDraftNoReply((current) => ({
+                            ...current,
+                            pathLabel: value,
+                          }));
+                        }}
+                        placeholder="Enter no reply label"
+                        className={styles.buttonsPathLabelInput}
+                        onPressEnter={() =>
+                          setPathLabelPopover((current) =>
+                            current === "noReply" ? null : current
+                          )
+                        }
+                      />
+                      <Button
+                        type="primary"
+                        className={styles.buttonsPathLabelDone}
+                        onClick={() =>
+                          setPathLabelPopover((current) =>
+                            current === "noReply" ? null : current
+                          )
+                        }
+                      >
+                        Done
+                      </Button>
+                    </div>
+                  }
+                >
+                  <button
+                    type="button"
+                    className={styles.buttonsPathLabelTrigger}
+                  >
+                    <span className={styles.buttonsPathLabelTriggerTitle}>
+                      Path label
+                    </span>
+                    <span className={styles.buttonsPathLabelTriggerValue}>
+                      {draftNoReply.pathLabel?.trim() || "No reply"}
+                    </span>
+                  </button>
+                </Popover>
+              )}
             </div>
           }
         >
@@ -1247,55 +1544,131 @@ const CaptureFallbackSettings: React.FC<CaptureFallbackSettingsProps> = ({
             onOpenChange={handleOpenChange("autoReprompt")}
             content={
               <div className={styles.buttonsFallbackCard}>
-                <div className={styles.captureAutoRepromptFields}>
-                  <div className={styles.captureFallbackFieldGroup}>
-                    <div className={styles.buttonsFallbackFieldLabel}>
-                      Temperature
-                    </div>
-                    <InputNumber
-                      min={0}
-                      max={2}
-                      step={0.1}
-                      value={draftAutoReprompt.temperature}
-                      onChange={(value) => {
-                        setDraftAutoReprompt((current) => ({
-                          ...current,
-                          temperature:
-                            typeof value === "number"
-                              ? Math.min(Math.max(value, 0), 2)
-                              : current.temperature,
-                        }));
-                      }}
-                    />
+                <Typography.Text
+                  strong
+                  style={{ display: "block", marginBottom: "8px" }}
+                >
+                  Overrides
+                </Typography.Text>
+
+                <div style={{ marginBottom: "24px" }}>
+                  <Typography.Title level={5} style={{ margin: "8px 0" }}>
+                    AI model
+                  </Typography.Title>
+                  <Select
+                    value={draftAutoReprompt.model}
+                    onChange={(value) => {
+                      setDraftAutoReprompt((current) => ({
+                        ...current,
+                        model: value,
+                      }));
+                    }}
+                    style={{ width: "100%" }}
+                    optionLabelProp="label"
+                  >
+                    {AI_MODELS.map((model) => (
+                      <Select.Option
+                        key={model.value}
+                        value={model.value}
+                        label={model.label}
+                      >
+                        <Space>
+                          <span>{model.icon}</span>
+                          <span>{model.label}</span>
+                        </Space>
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </div>
+
+                <div style={{ marginBottom: "24px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    <Typography.Text strong>Temperature</Typography.Text>
+                    <Typography.Text>
+                      {draftAutoReprompt.temperature}
+                    </Typography.Text>
                   </div>
-                  <div className={styles.captureFallbackFieldGroup}>
-                    <div className={styles.buttonsFallbackFieldLabel}>
-                      Max tokens
-                    </div>
-                    <InputNumber
-                      min={1}
-                      max={4000}
-                      value={draftAutoReprompt.maxTokens}
-                      onChange={(value) => {
-                        setDraftAutoReprompt((current) => ({
-                          ...current,
-                          maxTokens:
-                            typeof value === "number"
-                              ? Math.max(Math.floor(value), 1)
-                              : current.maxTokens,
-                        }));
-                      }}
-                    />
+                  <Slider
+                    min={0}
+                    max={2}
+                    step={0.1}
+                    value={draftAutoReprompt.temperature}
+                    onChange={(value) => {
+                      setDraftAutoReprompt((current) => ({
+                        ...current,
+                        temperature: value,
+                      }));
+                    }}
+                    style={{ margin: "16px 0" }}
+                  />
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "12px",
+                      color: "#999",
+                    }}
+                  >
+                    <span>Deterministic</span>
+                    <span>Random</span>
                   </div>
                 </div>
-                <div className={styles.captureFallbackFieldGroup}>
-                  <div className={styles.buttonsFallbackFieldLabel}>
-                    System prompt
+
+                <div style={{ marginBottom: "24px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    <Typography.Text strong>Max tokens</Typography.Text>
+                    <Typography.Text>
+                      {draftAutoReprompt.maxTokens}
+                    </Typography.Text>
                   </div>
+                  <Slider
+                    min={10}
+                    max={24000}
+                    step={100}
+                    value={draftAutoReprompt.maxTokens}
+                    onChange={(value) => {
+                      setDraftAutoReprompt((current) => ({
+                        ...current,
+                        maxTokens: value,
+                      }));
+                    }}
+                    style={{ margin: "16px 0" }}
+                  />
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "12px",
+                      color: "#999",
+                    }}
+                  >
+                    <span>10</span>
+                    <span>24000</span>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: "8px" }}>
+                  <Typography.Title level={5} style={{ margin: "8px 0" }}>
+                    System
+                  </Typography.Title>
                   <Input.TextArea
                     value={draftAutoReprompt.systemPrompt}
-                    autoSize={{ minRows: 2, maxRows: 6 }}
-                    placeholder="Provide guidance for reprompts"
+                    autoSize={{ minRows: 3, maxRows: 6 }}
+                    placeholder="You are a helpful assistant collecting data from the user."
                     onChange={(event) => {
                       const { value } = event.target;
                       setDraftAutoReprompt((current) => ({
@@ -1303,7 +1676,11 @@ const CaptureFallbackSettings: React.FC<CaptureFallbackSettingsProps> = ({
                         systemPrompt: value,
                       }));
                     }}
-                    className={styles.captureFallbackTextarea}
+                    style={{
+                      borderRadius: "8px",
+                      border: "1px solid #d9d9d9",
+                      padding: "8px 12px",
+                    }}
                   />
                 </div>
               </div>
@@ -2649,7 +3026,7 @@ const ButtonListEditor: React.FC<ButtonListEditorProps> = ({
         onClose={closeDrawer}
         width={420}
         closable={false}
-        destroyOnClose
+        destroyOnHidden
         className={styles.buttonDrawer}
         title={
           <div className={styles.buttonDrawerTitle}>
@@ -3007,18 +3384,26 @@ export default function PropertiesPanel({
   );
 
   const CaptureProperties = () => {
+    const [entityPopoverOpen, setEntityPopoverOpen] = useState(false);
+    const [entitySearch, setEntitySearch] = useState("");
+    const [entityCreationModalOpen, setEntityCreationModalOpen] =
+      useState(false);
+    const [bulkImportModalOpen, setBulkImportModalOpen] = useState(false);
+    const [bulkImportText, setBulkImportText] = useState("");
+    const [isDragActive, setIsDragActive] = useState(false);
+    const [newEntityName, setNewEntityName] = useState("");
+    const [entityDataType, setEntityDataType] = useState("custom");
+    const [entityValues, setEntityValues] = useState<string[]>([""]);
+    const [showAllValues, setShowAllValues] = useState(false);
+    const entities = useAppSelector((s) => s.entities?.list || []);
+    const entityDataTypes = useAppSelector((s) => s.entities?.dataTypes || []);
     const [captureMode, setCaptureMode] = useState<CaptureMode>(
       selectedNode.data.captureMode === "reply" ? "reply" : "entities"
     );
     const [entityRows, setEntityRows] = useState<CaptureEntityConfig[]>(
       normalizeCaptureEntities(selectedNode.data.entities)
     );
-    const [promptValue, setPromptValue] = useState<string>(
-      selectedNode.data.prompt || ""
-    );
-    const [validationValue, setValidationValue] = useState<string>(
-      selectedNode.data.validation || ""
-    );
+    // Removed promptValue and validationValue
     const [replyVariable, setReplyVariable] = useState<string>(
       selectedNode.data.variable || ""
     );
@@ -3040,14 +3425,25 @@ export default function PropertiesPanel({
     const [exitPathEnabled, setExitPathEnabled] = useState<boolean>(
       !!selectedNode.data.exitPathEnabled
     );
+    const [exitPathLabel, setExitPathLabel] = useState<string>(
+      selectedNode.data.exitPathLabel || "Exit scenario"
+    );
+    const [exitPathPopoverOpen, setExitPathPopoverOpen] = useState<boolean>(false);
+
+    // Local state for editing - prevents focus loss on typing
+    const [localRules, setLocalRules] = useState<string[]>(
+      normalizeStringList(selectedNode.data.rules)
+    );
+    const [localExitScenarios, setLocalExitScenarios] = useState<string[]>(
+      normalizeStringList(selectedNode.data.exitScenarios)
+    );
 
     useEffect(() => {
       setCaptureMode(
         selectedNode.data.captureMode === "reply" ? "reply" : "entities"
       );
       setEntityRows(normalizeCaptureEntities(selectedNode.data.entities));
-      setPromptValue(selectedNode.data.prompt || "");
-      setValidationValue(selectedNode.data.validation || "");
+      // Removed prompt and validation from effect
       setReplyVariable(selectedNode.data.variable || "");
       setListenForOtherTriggersState(
         !!selectedNode.data.listenForOtherTriggers
@@ -3059,6 +3455,12 @@ export default function PropertiesPanel({
       setRules(normalizeStringList(selectedNode.data.rules));
       setExitScenarios(normalizeStringList(selectedNode.data.exitScenarios));
       setExitPathEnabled(!!selectedNode.data.exitPathEnabled);
+      setExitPathLabel(selectedNode.data.exitPathLabel || "Exit scenario");
+      // Sync local state with main state
+      setLocalRules(normalizeStringList(selectedNode.data.rules));
+      setLocalExitScenarios(
+        normalizeStringList(selectedNode.data.exitScenarios)
+      );
     }, [
       selectedNodeId,
       selectedNode.data.captureMode,
@@ -3072,14 +3474,15 @@ export default function PropertiesPanel({
       selectedNode.data.rules,
       selectedNode.data.exitScenarios,
       selectedNode.data.exitPathEnabled,
+      selectedNode.data.exitPathLabel,
     ]);
 
     const commitPrompt = () => {
-      handleUpdateNode("prompt", promptValue);
+      // Removed commitPrompt
     };
 
     const commitValidation = () => {
-      handleUpdateNode("validation", validationValue);
+      // Removed commitValidation
     };
 
     const updateEntities = (
@@ -3094,16 +3497,159 @@ export default function PropertiesPanel({
       });
     };
 
-    const addEntityRow = () => {
+    const addEntityRow = (entityName?: string) => {
+      const nameToAdd = entityName !== undefined ? entityName : entitySearch;
+      if (!nameToAdd) return;
       updateEntities((current) => [
         ...current,
         {
           id: generateCaptureEntityId(),
-          entity: "",
+          entity: nameToAdd,
           variable: "",
           required: true,
         },
       ]);
+      setEntityPopoverOpen(false);
+      setEntitySearch("");
+    };
+
+    const handleCreateNewEntity = () => {
+      const trimmed = newEntityName.trim();
+      if (!trimmed) return;
+
+      // Parse entity values
+      const normalizedValues = entityValues
+        .map((entry) =>
+          entry
+            .split(",")
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0)
+        )
+        .filter((parts) => parts.length > 0)
+        .map((parts) => ({
+          value: parts[0],
+          synonyms: parts.slice(1).length > 0 ? parts.slice(1) : undefined,
+        }));
+
+      // Create entity with details
+      dispatch(
+        addEntityDetailed({
+          name: trimmed,
+          dataType: entityDataType,
+          values: normalizedValues.length ? normalizedValues : undefined,
+        })
+      );
+
+      // Add to current capture entity list
+      addEntityRow(trimmed);
+
+      // Reset modal state
+      setNewEntityName("");
+      setEntityDataType("custom");
+      setEntityValues([""]);
+      setShowAllValues(false);
+      setEntityCreationModalOpen(false);
+      setEntityPopoverOpen(false);
+    };
+
+    const addEntityValueRow = () => {
+      setEntityValues((current) => [...current, ""]);
+      // Reset to collapsed view when adding new values if we're above the limit
+      if (entityValues.length >= 8) {
+        setShowAllValues(false);
+      }
+    };
+
+    const removeEntityValueRow = (index: number) => {
+      setEntityValues((current) => {
+        const next = current.filter((_, i) => i !== index);
+        return next.length > 0 ? next : [""];
+      });
+    };
+
+    const handleEntityValueChange = (index: number, value: string) => {
+      setEntityValues((current) => {
+        const updated = [...current];
+        updated[index] = value;
+        return updated;
+      });
+    };
+
+    const handleBulkImport = () => {
+      const entries = bulkImportText
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+      setEntityValues(entries.length > 0 ? entries : [""]);
+      setShowAllValues(false); // Reset to collapsed view after bulk import
+      setBulkImportModalOpen(false);
+      setBulkImportText("");
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragActive(true);
+    };
+
+    const handleDragEnter = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragActive(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Only set to false if we're leaving the textarea entirely
+      const rect = (e.target as HTMLElement).getBoundingClientRect();
+      const x = e.clientX;
+      const y = e.clientY;
+      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+        setIsDragActive(false);
+      }
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragActive(false);
+
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length === 0) return;
+
+      const file = files[0];
+
+      // Check if it's a CSV file or text file
+      if (
+        file.type === "text/csv" ||
+        file.type === "text/plain" ||
+        file.name.endsWith(".csv") ||
+        file.name.endsWith(".txt")
+      ) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const content = event.target?.result as string;
+          if (content) {
+            setBulkImportText(content);
+            dispatch(
+              showToast({
+                message: `Successfully loaded ${file.name}`,
+                type: "success",
+              })
+            );
+          }
+        };
+        reader.readAsText(file);
+      } else {
+        // Show error for unsupported file types
+        dispatch(
+          showToast({
+            message: "Please drop a CSV or text file",
+            type: "error",
+          })
+        );
+      }
     };
 
     const removeEntityRow = (rowId: string) => {
@@ -3178,289 +3724,524 @@ export default function PropertiesPanel({
     );
 
     const addRule = () => {
-      setRules((current) => {
-        const next = [...current, ""];
-        handleUpdateNodeBatch({ rules: serializeStringList(next) });
+      const newRules = [...localRules, ""];
+      setLocalRules(newRules);
+      setRules(newRules);
+      handleUpdateNodeBatch({ rules: serializeStringList(newRules) });
+    };
+
+    const updateRuleLocal = (index: number, value: string) => {
+      setLocalRules((current) => {
+        const next = [...current];
+        next[index] = value;
         return next;
       });
     };
 
-    const updateRule = (index: number, value: string) => {
-      setRules((current) => {
-        const next = [...current];
-        next[index] = value;
-        handleUpdateNodeBatch({ rules: serializeStringList(next) });
-        return next;
-      });
+    const commitRule = (index: number) => {
+      const updatedRules = [...localRules];
+      setRules(updatedRules);
+      handleUpdateNodeBatch({ rules: serializeStringList(updatedRules) });
     };
 
     const removeRule = (index: number) => {
-      setRules((current) => {
-        const next = current.filter((_, idx) => idx !== index);
-        handleUpdateNodeBatch({ rules: serializeStringList(next) });
-        return next;
-      });
+      const newRules = localRules.filter((_, idx) => idx !== index);
+      setLocalRules(newRules);
+      setRules(newRules);
+      handleUpdateNodeBatch({ rules: serializeStringList(newRules) });
     };
 
     const addExitScenario = () => {
-      setExitScenarios((current) => {
-        const next = [...current, ""];
-        handleUpdateNodeBatch({ exitScenarios: serializeStringList(next) });
+      const newScenarios = [...localExitScenarios, ""];
+      setLocalExitScenarios(newScenarios);
+      setExitScenarios(newScenarios);
+      handleUpdateNodeBatch({
+        exitScenarios: serializeStringList(newScenarios),
+      });
+    };
+
+    const updateExitScenarioLocal = (index: number, value: string) => {
+      setLocalExitScenarios((current) => {
+        const next = [...current];
+        next[index] = value;
         return next;
       });
     };
 
-    const updateExitScenario = (index: number, value: string) => {
-      setExitScenarios((current) => {
-        const next = [...current];
-        next[index] = value;
-        handleUpdateNodeBatch({ exitScenarios: serializeStringList(next) });
-        return next;
+    const commitExitScenario = (index: number) => {
+      const updatedScenarios = [...localExitScenarios];
+      setExitScenarios(updatedScenarios);
+      handleUpdateNodeBatch({
+        exitScenarios: serializeStringList(updatedScenarios),
       });
     };
 
     const removeExitScenario = (index: number) => {
-      setExitScenarios((current) => {
-        const next = current.filter((_, idx) => idx !== index);
-        handleUpdateNodeBatch({ exitScenarios: serializeStringList(next) });
-        return next;
+      const newScenarios = localExitScenarios.filter((_, idx) => idx !== index);
+      setLocalExitScenarios(newScenarios);
+      setExitScenarios(newScenarios);
+      handleUpdateNodeBatch({
+        exitScenarios: serializeStringList(newScenarios),
       });
     };
 
     const toggleExitPath = (checked: boolean) => {
       setExitPathEnabled(checked);
-      handleUpdateNodeBatch({ exitPathEnabled: checked });
+      handleUpdateNodeBatch({
+        exitPathEnabled: checked,
+        exitPathLabel: checked ? exitPathLabel : undefined,
+      });
     };
 
     return (
-      <Form layout="vertical">
-        <Form.Item label="Capture">
-          <Select
-            value={captureMode}
-            onChange={(value) => commitCaptureMode(value as CaptureMode)}
-            options={[
-              { label: "Entities", value: "entities" },
-              { label: "Entire user reply", value: "reply" },
-            ]}
-            className={styles.captureModeSelect}
-          />
-        </Form.Item>
-
-        <Form.Item label="Prompt">
-          <Input.TextArea
-            value={promptValue}
-            autoSize={{ minRows: 2, maxRows: 6 }}
-            placeholder="Ask the user for the information you need"
-            onChange={(event) => setPromptValue(event.target.value)}
-            onBlur={commitPrompt}
-          />
-        </Form.Item>
-
-        <Form.Item label="Validation">
-          <Input.TextArea
-            value={validationValue}
-            autoSize={{ minRows: 2, maxRows: 6 }}
-            placeholder="Describe any validation requirements"
-            onChange={(event) => setValidationValue(event.target.value)}
-            onBlur={commitValidation}
-          />
-        </Form.Item>
-
-        {captureMode === "reply" && (
-          <Form.Item label="Save reply to variable">
-            <VariablePicker
-              value={replyVariable}
-              onChange={(value) => {
-                const nextValue = value || "";
-                setReplyVariable(nextValue);
-                handleUpdateNode("variable", nextValue);
-              }}
-              placeholder="Select variable"
-              allowCreate
-              createMode="modal"
+      <div className={styles.choiceProperties}>
+        <Form layout="vertical">
+          <Form.Item label="Capture">
+            <Select
+              value={captureMode}
+              onChange={(value) => commitCaptureMode(value as CaptureMode)}
+              options={[
+                { label: "Entities", value: "entities" },
+                { label: "Entire user reply", value: "reply" },
+              ]}
+              className={styles.captureModeSelect}
             />
           </Form.Item>
-        )}
+          {captureMode === "reply" && (
+            <Form.Item label="Save reply to variable">
+              <VariablePicker
+                value={replyVariable}
+                onChange={(value) => {
+                  const nextValue = value || "";
+                  setReplyVariable(nextValue);
+                  handleUpdateNode("variable", nextValue);
+                }}
+                placeholder="Select variable"
+                allowCreate
+                createMode="modal"
+              />
+            </Form.Item>
+          )}
+        </Form>
 
         {captureMode === "entities" && (
-          <div className={styles.captureSection}>
-            <div className={styles.captureEntitiesHeader}>
-              <span className={styles.sectionTitle}>Entities</span>
-              <Button
-                type="dashed"
-                size="small"
-                icon={<PlusOutlined />}
-                onClick={addEntityRow}
-                className={styles.captureAddRowButton}
+          <>
+            <div className={styles.choiceHeaderRow}>
+              <Typography.Text className={styles.sectionHeading}>
+                Entities
+              </Typography.Text>
+              <Popover
+                trigger="click"
+                open={entityPopoverOpen}
+                onOpenChange={setEntityPopoverOpen}
+                placement="bottomRight"
+                content={
+                  <div className={styles.entityPopoverContainer}>
+                    <div className={styles.entityPopoverSearchContainer}>
+                      <div className={styles.entityPopoverSearchRow}>
+                        <span className={styles.entityPopoverSearchIcon}>
+                          <svg width="18" height="18" fill="none">
+                            <path
+                              d="M8.5 15.5a7 7 0 1 1 0-14 7 7 0 0 1 0 14Zm5.5-1-3-3"
+                              stroke="#94a3b8"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                        </span>
+                        <input
+                          className={styles.entityPopoverSearchInput}
+                          placeholder="Search"
+                          value={entitySearch}
+                          onChange={(e) => setEntitySearch(e.target.value)}
+                          autoFocus
+                        />
+                      </div>
+                    </div>
+                    <div className={styles.entityPopoverDivider} />
+                    <div className={styles.entityPopoverList}>
+                      {entities
+                        .filter(
+                          (e) =>
+                            !entitySearch ||
+                            e.toLowerCase().includes(entitySearch.toLowerCase())
+                        )
+                        .filter(
+                          (e) => !entityRows.some((row) => row.entity === e)
+                        )
+                        .map((e) => (
+                          <div
+                            key={e}
+                            className={styles.entityPopoverItem}
+                            onClick={() => addEntityRow(e)}
+                          >
+                            {e}
+                          </div>
+                        ))}
+                    </div>
+                    <div className={styles.entityPopoverDivider} />
+                    <div className={styles.entityPopoverCreateAction}>
+                      <span
+                        className={styles.entityPopoverCreateButton}
+                        onClick={() => setEntityCreationModalOpen(true)}
+                      >
+                        Create entity
+                      </span>
+                    </div>
+                  </div>
+                }
               >
-                Add entity
-              </Button>
+                <Button
+                  icon={<PlusOutlined />}
+                  type="text"
+                  className={styles.choiceAddButton}
+                />
+              </Popover>
             </div>
-            {entityRows.length === 0 ? (
-              <div className={styles.captureEmptyState}>
-                Add the entities you want to capture from the user's reply.
-              </div>
-            ) : (
+            <div className={styles.choiceList}>
               <div className={styles.captureEntitiesList}>
                 {entityRows.map((row) => (
                   <div key={row.id} className={styles.captureEntityRow}>
                     <div className={styles.captureEntityColumn}>
-                      <EntityPicker
-                        value={row.entity}
-                        onChange={(value) =>
-                          setEntityRowValue(row.id, { entity: value || "" })
-                        }
-                        placeholder="Select entity"
-                      />
-                      <div className={styles.captureEntityMeta}>
-                        <VariablePicker
-                          value={row.variable}
-                          onChange={(value) =>
-                            setEntityRowValue(row.id, {
-                              variable: value || "",
-                            })
-                          }
-                          placeholder="Save to variable"
-                          allowCreate
-                          createMode="modal"
-                        />
-                        <Switch
-                          checkedChildren="Required"
-                          unCheckedChildren="Optional"
-                          checked={row.required}
-                          onChange={(checked) =>
-                            setEntityRowValue(row.id, { required: checked })
-                          }
-                        />
-                      </div>
+                      <span className={styles.captureEntityText}>
+                        {row.entity}
+                      </span>
                     </div>
                     <div className={styles.captureEntityActions}>
                       <Button
                         type="text"
-                        icon={<DeleteOutlined />}
+                        icon={<MinusOutlined />}
                         onClick={() => removeEntityRow(row.id)}
-                        className={styles.captureRemoveButton}
+                        className={styles.choiceRemoveButton}
                         aria-label="Remove entity"
                       />
                     </div>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+            <Divider className={styles.choiceDivider} />
+          </>
         )}
 
-        <div className={styles.captureSection}>
-          <CaptureFallbackSettings
-            noReply={noReplyState}
-            onChangeNoReply={commitNoReplyConfig}
-            autoReprompt={autoRepromptState}
-            onChangeAutoReprompt={commitAutoRepromptConfig}
-            listenForOtherTriggers={listenForOtherTriggersState}
-            onListenForOtherTriggersChange={toggleListenForOtherTriggers}
-            showAutoReprompt={captureMode === "entities"}
-          />
-        </div>
+        <CaptureFallbackSettings
+          noReply={noReplyState}
+          onChangeNoReply={commitNoReplyConfig}
+          autoReprompt={autoRepromptState}
+          onChangeAutoReprompt={commitAutoRepromptConfig}
+          listenForOtherTriggers={listenForOtherTriggersState}
+          onListenForOtherTriggersChange={toggleListenForOtherTriggers}
+          showAutoReprompt={captureMode === "entities"}
+        />
 
         {captureMode === "entities" && (
-          <div className={styles.captureSection}>
-            <div className={styles.captureEntitiesHeader}>
-              <span className={styles.sectionTitle}>Rules</span>
+          <>
+            <div className={styles.choiceHeaderRow}>
+              <Typography.Text className={styles.sectionHeading}>
+                Rules
+              </Typography.Text>
               <Button
-                type="dashed"
-                size="small"
                 icon={<PlusOutlined />}
+                type="text"
                 onClick={addRule}
-              >
-                Add rule
-              </Button>
+                className={styles.choiceAddButton}
+              />
             </div>
-            {rules.length === 0 ? (
-              <div className={styles.captureEmptyState}>
-                Add natural language guidance for the AI to validate captured
-                entities.
-              </div>
-            ) : (
-              <div className={styles.captureList}>
-                {rules.map((rule, index) => (
-                  <div key={`rule-${index}`} className={styles.captureListItem}>
-                    <Input.TextArea
-                      value={rule}
-                      onChange={(event) =>
-                        updateRule(index, event.target.value)
-                      }
-                      autoSize={{ minRows: 2, maxRows: 6 }}
-                      className={styles.captureListTextarea}
-                      placeholder="Example: The email address must be valid."
-                    />
-                    <Button
-                      type="text"
-                      icon={<DeleteOutlined />}
-                      onClick={() => removeRule(index)}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className={styles.choiceList}>
+              {localRules.length === 0 ? (
+                <div className={styles.captureEmptyState}>
+                  Add natural language guidance for the AI to validate captured
+                  entities.
+                </div>
+              ) : (
+                <div className={styles.rulesContainer}>
+                  {localRules.map((rule, index) => (
+                    <div key={`rule-${index}`} className={styles.ruleItem}>
+                      <Input.TextArea
+                        value={rule}
+                        onChange={(event) =>
+                          updateRuleLocal(index, event.target.value)
+                        }
+                        onBlur={() => commitRule(index)}
+                        autoSize={{ minRows: 1, maxRows: 4 }}
+                        placeholder={`Enter rule ${index + 1}...`}
+                        className={styles.ruleTextarea}
+                      />
+                      <Button
+                        type="text"
+                        icon={<MinusOutlined />}
+                        onClick={() => removeRule(index)}
+                        className={styles.ruleRemoveButton}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-            <div className={styles.captureEntitiesHeader}>
-              <span className={styles.sectionTitle}>Exit scenarios</span>
+            <Divider className={styles.rulesSectionDivider} />
+
+            <div className={styles.choiceHeaderRow}>
+              <Typography.Text className={styles.sectionHeading}>
+                Exit scenarios
+              </Typography.Text>
               <Button
-                type="dashed"
-                size="small"
                 icon={<PlusOutlined />}
+                type="text"
                 onClick={addExitScenario}
-              >
-                Add scenario
-              </Button>
+                className={styles.choiceAddButton}
+              />
             </div>
-            {exitScenarios.length === 0 ? (
-              <div className={styles.captureEmptyState}>
-                Document when the assistant should stop collecting entities.
-              </div>
-            ) : (
-              <div className={styles.captureList}>
-                {exitScenarios.map((scenario, index) => (
-                  <div
-                    key={`exit-scenario-${index}`}
-                    className={styles.captureListItem}
-                  >
-                    <Input.TextArea
-                      value={scenario}
-                      onChange={(event) =>
-                        updateExitScenario(index, event.target.value)
-                      }
-                      autoSize={{ minRows: 2, maxRows: 6 }}
-                      className={styles.captureListTextarea}
-                      placeholder="Example: The user says they don't have that information."
-                    />
-                    <Button
-                      type="text"
-                      icon={<DeleteOutlined />}
-                      onClick={() => removeExitScenario(index)}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className={styles.choiceList}>
+              {localExitScenarios.length === 0 ? (
+                <div className={styles.captureEmptyState}>
+                  Document when the assistant should stop collecting entities.
+                </div>
+              ) : (
+                <div className={styles.rulesContainer}>
+                  {localExitScenarios.map((scenario, index) => (
+                    <div
+                      key={`exit-scenario-${index}`}
+                      className={styles.ruleItem}
+                    >
+                      <Input.TextArea
+                        value={scenario}
+                        onChange={(event) =>
+                          updateExitScenarioLocal(index, event.target.value)
+                        }
+                        onBlur={() => commitExitScenario(index)}
+                        autoSize={{ minRows: 1, maxRows: 4 }}
+                        placeholder={`Exit if...`}
+                        className={styles.ruleTextarea}
+                      />
+                      <Button
+                        type="text"
+                        icon={<MinusOutlined />}
+                        onClick={() => removeExitScenario(index)}
+                        className={styles.ruleRemoveButton}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className={styles.captureToggleCard}>
               <div className={styles.captureToggleHeader}>
                 <div>
-                  <div className={styles.sectionTitle}>Exit path</div>
-                  <div className={styles.captureToggleDescription}>
-                    Provide a dedicated path when an exit scenario is matched.
-                  </div>
+                  <Popover
+                    trigger={["click"]}
+                    destroyTooltipOnHide
+                    placement="left"
+                    open={exitPathPopoverOpen}
+                    onOpenChange={(open) => {
+                      setExitPathPopoverOpen(open);
+                    }}
+                    content={
+                      <div style={{ width: "200px", padding: "4px" }}>
+                        <Typography.Text style={{ fontSize: "12px", color: "#666", marginBottom: "8px", display: "block" }}>
+                          Path label
+                        </Typography.Text>
+                        <Input
+                          autoFocus
+                          value={exitPathLabel}
+                          onChange={(event) => {
+                            const { value } = event.target;
+                            setExitPathLabel(value);
+                          }}
+                          onBlur={() => {
+                            handleUpdateNodeBatch({ exitPathLabel });
+                          }}
+                          placeholder="Enter exit path label"
+                          onPressEnter={() => {
+                            setExitPathPopoverOpen(false);
+                            handleUpdateNodeBatch({ exitPathLabel });
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Escape") {
+                              setExitPathPopoverOpen(false);
+                            }
+                          }}
+                        />
+                      </div>
+                    }
+                  >
+                    <Typography.Text 
+                      className={styles.sectionHeading} 
+                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                      onClick={() => setExitPathPopoverOpen(true)}
+                    >
+                      Exit scenario path
+                    </Typography.Text>
+                  </Popover>
                 </div>
-                <Switch
-                  checked={exitPathEnabled}
-                  onChange={toggleExitPath}
-                />
+                <Switch checked={exitPathEnabled} onChange={toggleExitPath} />
               </div>
             </div>
-          </div>
+          </>
         )}
-      </Form>
+
+        {/* Entity Creation Modal */}
+        <Modal
+          title="Create entity"
+          open={entityCreationModalOpen}
+          onCancel={() => {
+            setEntityCreationModalOpen(false);
+            setNewEntityName("");
+            setEntityDataType("custom");
+            setEntityValues([""]);
+            setShowAllValues(false);
+          }}
+          onOk={handleCreateNewEntity}
+          okText="Create entity"
+          cancelText="Cancel"
+          okButtonProps={{
+            disabled:
+              !newEntityName.trim() ||
+              (entityDataType === "custom" &&
+                entityValues.every((v) => !v.trim())),
+          }}
+          destroyOnHidden
+          width={520}
+        >
+          <Form layout="vertical">
+            <Form.Item label="Name" required>
+              <Input
+                value={newEntityName}
+                onChange={(e) => setNewEntityName(e.target.value)}
+                placeholder="Enter entity name"
+                onPressEnter={handleCreateNewEntity}
+                autoFocus
+              />
+            </Form.Item>
+
+            <Form.Item label="Data type">
+              <Select
+                value={entityDataType}
+                onChange={setEntityDataType}
+                options={entityDataTypes}
+              />
+            </Form.Item>
+
+            {entityDataType === "custom" && (
+              <div>
+                <div className={styles.entityModalValuesHeader}>
+                  <span className={styles.entityModalValuesLabel}>
+                    Values{" "}
+                    <span className={styles.entityModalRequiredStar}>*</span>
+                  </span>
+                  <Space size="small">
+                    <Button
+                      type="default"
+                      size="small"
+                      icon={<InboxOutlined />}
+                      onClick={() => setBulkImportModalOpen(true)}
+                    />
+                    <Button
+                      type="default"
+                      size="small"
+                      icon={<PlusOutlined />}
+                      onClick={addEntityValueRow}
+                    />
+                  </Space>
+                </div>
+                <div className={styles.entityModalValuesContainer}>
+                  {(showAllValues
+                    ? entityValues
+                    : entityValues.slice(0, 8)
+                  ).map((entry, index) => (
+                    <div
+                      key={`entity-value-${index}`}
+                      className={styles.entityModalValueRow}
+                    >
+                      <Input
+                        className={styles.entityModalValueInput}
+                        value={entry}
+                        onChange={(event) =>
+                          handleEntityValueChange(index, event.target.value)
+                        }
+                        placeholder="Add synonyms, comma separated"
+                      />
+                      <Button
+                        type="text"
+                        icon={<MinusCircleOutlined />}
+                        onClick={() => removeEntityValueRow(index)}
+                        disabled={entityValues.length === 1}
+                      />
+                    </div>
+                  ))}
+                  {entityValues.length > 8 && (
+                    <div className={styles.entityModalToggleContainer}>
+                      <Button
+                        type="link"
+                        onClick={() => setShowAllValues(!showAllValues)}
+                        className={styles.entityModalToggleButton}
+                      >
+                        {showAllValues
+                          ? "Show less"
+                          : `Show all values (${entityValues.length})`}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <div className={styles.entityModalHelperText}>
+                  Add values and synonyms (comma separated)
+                </div>
+              </div>
+            )}
+          </Form>
+        </Modal>
+
+        {/* Bulk Import Modal */}
+        <Modal
+          title="Bulk import entity values"
+          open={bulkImportModalOpen}
+          onCancel={() => {
+            setBulkImportModalOpen(false);
+            setBulkImportText("");
+            setIsDragActive(false);
+          }}
+          onOk={handleBulkImport}
+          okText="Import"
+          cancelText="Close"
+          destroyOnHidden
+          width={520}
+          afterClose={() => {
+            setIsDragActive(false);
+          }}
+        >
+          <Form layout="vertical">
+            <Form.Item
+              label="Entity values"
+              extra="Format: value 1, synonym 1, 2, 3... One entity value per line."
+            >
+              <TextArea
+                value={bulkImportText}
+                onChange={(e) => setBulkImportText(e.target.value)}
+                placeholder={
+                  isDragActive
+                    ? "Drop CSV file here..."
+                    : "Enter values, or drop CSV here"
+                }
+                rows={8}
+                style={{
+                  resize: "vertical",
+                  border: isDragActive
+                    ? "2px dashed #1890ff"
+                    : "2px dashed #d9d9d9",
+                  backgroundColor: isDragActive ? "#f6ffed" : "transparent",
+                  borderRadius: "6px",
+                  transition: "all 0.3s ease",
+                }}
+                onDragOver={handleDragOver}
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              />
+            </Form.Item>
+          </Form>
+        </Modal>
+      </div>
     );
   };
 
@@ -5016,10 +5797,7 @@ export default function PropertiesPanel({
   const ChoiceProperties = () => {
     const rawChoices = selectedNode.data.choices as any[] | undefined;
     const normalizedChoices = useMemo(
-      () =>
-        normalizeChoiceOptions(
-          Array.isArray(rawChoices) ? rawChoices : []
-        ),
+      () => normalizeChoiceOptions(Array.isArray(rawChoices) ? rawChoices : []),
       [rawChoices]
     );
     const initialChoices =
@@ -5239,13 +6017,12 @@ export default function PropertiesPanel({
                       </div>
                     }
                   >
-                    <button
-                      type="button"
-                      className={styles.choiceListTrigger}
-                    >
+                    <button type="button" className={styles.choiceListTrigger}>
                       <span
                         className={`${styles.choiceListTriggerText} ${
-                          isPlaceholder ? styles.choiceListTriggerPlaceholder : ""
+                          isPlaceholder
+                            ? styles.choiceListTriggerPlaceholder
+                            : ""
                         }`}
                       >
                         {summaryDisplay}
@@ -5404,22 +6181,21 @@ export default function PropertiesPanel({
       delete buttonLabelRefs.current[id];
     };
 
-    const handleButtonPopoverOpenChange =
-      (id: string) => (open: boolean) => {
-        setActiveButtonId((prev) => {
-          if (open) {
-            if (prev && prev !== id) {
-              persistButtons();
-            }
-            return id;
-          }
-          if (prev === id) {
+    const handleButtonPopoverOpenChange = (id: string) => (open: boolean) => {
+      setActiveButtonId((prev) => {
+        if (open) {
+          if (prev && prev !== id) {
             persistButtons();
-            return null;
           }
-          return prev;
-        });
-      };
+          return id;
+        }
+        if (prev === id) {
+          persistButtons();
+          return null;
+        }
+        return prev;
+      });
+    };
 
     const renderButtonEditor = (button: ButtonsNodeButton) => {
       const canRenderAddAnother = buttonsStateRef.current.length < 10;
@@ -5439,9 +6215,7 @@ export default function PropertiesPanel({
               }
             }}
             value={button.label}
-            onChange={(value) =>
-              updateButtonLocal(button.id, { label: value })
-            }
+            onChange={(value) => updateButtonLocal(button.id, { label: value })}
             onBlur={() => persistButtons()}
             onPressEnter={() => {
               persistButtons();
@@ -5504,7 +6278,9 @@ export default function PropertiesPanel({
                   className={`${styles.buttonsNodeListItem} ${
                     isActive ? styles.buttonsNodeListItemActive : ""
                   } ${
-                    button.label.trim() ? "" : styles.buttonsNodeListItemInactive
+                    button.label.trim()
+                      ? ""
+                      : styles.buttonsNodeListItemInactive
                   }`}
                 >
                   <span className={styles.buttonsNodeListLabel}>

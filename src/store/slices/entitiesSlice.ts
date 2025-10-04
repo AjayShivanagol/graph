@@ -1,5 +1,10 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
+export interface EntityDataType {
+  label: string;
+  value: string;
+}
+
 export interface EntityValue {
   value: string;
   synonyms?: string[];
@@ -15,15 +20,30 @@ export interface EntityDetail {
 export interface EntitiesState {
   list: string[];
   details: Record<string, EntityDetail>;
+  dataTypes: EntityDataType[];
 }
 
 const initialState: EntitiesState = {
   list: ["OrderNumber", "Email", "Location"],
   details: {},
+  dataTypes: [
+    { label: "Custom", value: "custom" },
+    { label: "Number", value: "number" },
+    { label: "Email", value: "email" },
+    { label: "Name", value: "name" },
+    { label: "Age", value: "age" },
+    { label: "Url", value: "url" },
+    { label: "Phone", value: "phone" },
+    { label: "Date", value: "date" },
+    { label: "Time", value: "time" },
+    { label: "Location", value: "location" },
+  ],
 };
 
 const ensureUniqueSorted = (items: string[]) => {
-  const unique = Array.from(new Set(items.map((item) => item.trim()))).filter(Boolean);
+  const unique = Array.from(new Set(items.map((item) => item.trim()))).filter(
+    Boolean
+  );
   unique.sort((a, b) => a.localeCompare(b));
   return unique;
 };
@@ -83,9 +103,17 @@ export const entitiesSlice = createSlice({
       state.list = state.list.filter((entity) => entity !== target);
       delete state.details[target];
     },
+    setDataTypes(state, action: PayloadAction<EntityDataType[]>) {
+      state.dataTypes = action.payload;
+    },
   },
 });
 
-export const { setEntities, addEntity, addEntityDetailed, removeEntity } =
-  entitiesSlice.actions;
+export const {
+  setEntities,
+  addEntity,
+  addEntityDetailed,
+  removeEntity,
+  setDataTypes,
+} = entitiesSlice.actions;
 export default entitiesSlice.reducer;
