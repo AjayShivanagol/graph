@@ -224,6 +224,20 @@ const serializeAutoRepromptConfig = (config: CaptureAutoRepromptConfig) => ({
   systemPrompt: config.systemPrompt,
 });
 
+const captureNoReplyEqual = (
+  a: CaptureNoReplyConfig,
+  b: CaptureNoReplyConfig
+) => a.enabled === b.enabled && a.timeout === b.timeout && a.prompt === b.prompt;
+
+const captureAutoRepromptEqual = (
+  a: CaptureAutoRepromptConfig,
+  b: CaptureAutoRepromptConfig
+) =>
+  a.enabled === b.enabled &&
+  Number(a.temperature.toFixed(2)) === Number(b.temperature.toFixed(2)) &&
+  a.maxTokens === b.maxTokens &&
+  a.systemPrompt === b.systemPrompt;
+
 const normalizeStringList = (value: any): string[] => {
   if (!Array.isArray(value)) return [];
   return value.map((entry) => `${entry ?? ""}`);
@@ -999,6 +1013,346 @@ const FallbackSettings: React.FC<FallbackSettingsProps> = ({
             <Switch
               checked={listenForOtherTriggers}
               onChange={setListenForOtherTriggers}
+            />
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+interface CaptureFallbackSettingsProps {
+  noReply: CaptureNoReplyConfig;
+  onChangeNoReply: (next: CaptureNoReplyConfig) => void;
+  autoReprompt: CaptureAutoRepromptConfig;
+  onChangeAutoReprompt: (next: CaptureAutoRepromptConfig) => void;
+  listenForOtherTriggers: boolean;
+  onListenForOtherTriggersChange: (checked: boolean) => void;
+  showAutoReprompt: boolean;
+}
+
+const CaptureFallbackSettings: React.FC<CaptureFallbackSettingsProps> = ({
+  noReply,
+  onChangeNoReply,
+  autoReprompt,
+  onChangeAutoReprompt,
+  listenForOtherTriggers,
+  onListenForOtherTriggersChange,
+  showAutoReprompt,
+}) => {
+  const [activePopover, setActivePopover] = useState<
+    "noReply" | "autoReprompt" | null
+  >(null);
+  const [draftNoReply, setDraftNoReply] = useState<CaptureNoReplyConfig>(
+    ensureNoReplyConfig(noReply)
+  );
+  const [draftAutoReprompt, setDraftAutoReprompt] =
+    useState<CaptureAutoRepromptConfig>(
+      ensureAutoRepromptConfig(autoReprompt)
+    );
+
+  useEffect(() => {
+    if (activePopover !== "noReply") {
+      setDraftNoReply(ensureNoReplyConfig(noReply));
+    }
+  }, [noReply, activePopover]);
+
+  useEffect(() => {
+    if (activePopover !== "autoReprompt") {
+      setDraftAutoReprompt(ensureAutoRepromptConfig(autoReprompt));
+    }
+  }, [autoReprompt, activePopover]);
+
+  useEffect(() => {
+    if (!showAutoReprompt && activePopover === "autoReprompt") {
+      setActivePopover(null);
+    }
+  }, [showAutoReprompt, activePopover]);
+
+  const commitDraft = useCallback(
+    (key: "noReply" | "autoReprompt") => {
+      if (key === "noReply") {
+        const ensured = ensureNoReplyConfig({
+          ...draftNoReply,
+          enabled: ensureNoReplyConfig(noReply).enabled,
+        });
+        if (!captureNoReplyEqual(ensured, ensureNoReplyConfig(noReply))) {
+          onChangeNoReply(ensured);
+        }
+        setDraftNoReply(ensured);
+      } else {
+        const ensured = ensureAutoRepromptConfig({
+          ...draftAutoReprompt,
+          enabled: ensureAutoRepromptConfig(autoReprompt).enabled,
+        });
+        if (
+          !captureAutoRepromptEqual(
+            ensured,
+            ensureAutoRepromptConfig(autoReprompt)
+          )
+        ) {
+          onChangeAutoReprompt(ensured);
+        }
+        setDraftAutoReprompt(ensured);
+      }
+    },
+    [
+      autoReprompt,
+      draftAutoReprompt,
+      draftNoReply,
+      noReply,
+      onChangeAutoReprompt,
+      onChangeNoReply,
+    ]
+  );
+
+  const handleOpenChange = useCallback(
+    (key: "noReply" | "autoReprompt") => (open: boolean) => {
+      setActivePopover((current) => {
+        if (open) {
+          if (current && current !== key) {
+            commitDraft(current);
+          }
+          if (key === "noReply") {
+            setDraftNoReply(ensureNoReplyConfig(noReply));
+          } else {
+            setDraftAutoReprompt(ensureAutoRepromptConfig(autoReprompt));
+          }
+          return key;
+        }
+        commitDraft(key);
+        return current === key ? null : current;
+      });
+    },
+    [autoReprompt, commitDraft, noReply]
+  );
+
+  const toggleNoReply = (checked: boolean) => {
+    const ensured = ensureNoReplyConfig({ ...noReply, enabled: checked });
+    if (!captureNoReplyEqual(ensured, ensureNoReplyConfig(noReply))) {
+      onChangeNoReply(ensured);
+    }
+    setDraftNoReply(ensured);
+    setActivePopover((current) => {
+      if (checked) {
+        return "noReply";
+      }
+      return current === "noReply" ? null : current;
+    });
+  };
+
+  const toggleAutoReprompt = (checked: boolean) => {
+    const ensured = ensureAutoRepromptConfig({
+      ...autoReprompt,
+      enabled: checked,
+    });
+    if (
+      !captureAutoRepromptEqual(ensured, ensureAutoRepromptConfig(autoReprompt))
+    ) {
+      onChangeAutoReprompt(ensured);
+    }
+    setDraftAutoReprompt(ensured);
+    setActivePopover((current) => {
+      if (checked) {
+        return "autoReprompt";
+      }
+      return current === "autoReprompt" ? null : current;
+    });
+  };
+
+  return (
+    <div className={styles.fallbackSection}>
+      <Typography.Text className={styles.sectionHeading}>
+        Fallbacks
+      </Typography.Text>
+      <div className={styles.buttonsFallbackList}>
+        <Popover
+          trigger={["click"]}
+          destroyOnHidden
+          placement="left"
+          overlayClassName={styles.buttonsFallbackPopover}
+          open={activePopover === "noReply"}
+          onOpenChange={handleOpenChange("noReply")}
+          content={
+            <div className={styles.buttonsFallbackCard}>
+              <div className={styles.buttonsFallbackFieldRow}>
+                <div className={styles.buttonsFallbackFieldLabel}>
+                  Inactivity time (sec)
+                </div>
+                <InputNumber
+                  min={1}
+                  max={120}
+                  value={draftNoReply.timeout}
+                  onChange={(value) => {
+                    setDraftNoReply((current) => ({
+                      ...current,
+                      timeout:
+                        typeof value === "number"
+                          ? Math.max(Math.floor(value), 1)
+                          : current.timeout,
+                    }));
+                  }}
+                />
+              </div>
+              <div className={styles.captureFallbackFieldGroup}>
+                <div className={styles.buttonsFallbackFieldLabel}>
+                  Reprompt message
+                </div>
+                <Input.TextArea
+                  value={draftNoReply.prompt}
+                  autoSize={{ minRows: 2, maxRows: 6 }}
+                  placeholder="Enter reprompt"
+                  onChange={(event) => {
+                    const { value } = event.target;
+                    setDraftNoReply((current) => ({
+                      ...current,
+                      prompt: value,
+                    }));
+                  }}
+                  className={styles.captureFallbackTextarea}
+                />
+              </div>
+            </div>
+          }
+        >
+          <div
+            className={`${styles.buttonsFallbackItem} ${
+              activePopover === "noReply"
+                ? styles.buttonsFallbackItemActive
+                : ""
+            } ${
+              !noReply.enabled && activePopover !== "noReply"
+                ? styles.buttonsFallbackItemInactive
+                : ""
+            }`}
+          >
+            <span className={styles.buttonsFallbackItemLabel}>No reply</span>
+            <span
+              className={styles.buttonsFallbackSwitch}
+              onClick={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <Switch checked={!!noReply.enabled} onChange={toggleNoReply} />
+            </span>
+          </div>
+        </Popover>
+
+        {showAutoReprompt && (
+          <Popover
+            trigger={["click"]}
+            destroyOnHidden
+            placement="left"
+            overlayClassName={styles.buttonsFallbackPopover}
+            open={activePopover === "autoReprompt"}
+            onOpenChange={handleOpenChange("autoReprompt")}
+            content={
+              <div className={styles.buttonsFallbackCard}>
+                <div className={styles.captureAutoRepromptFields}>
+                  <div className={styles.captureFallbackFieldGroup}>
+                    <div className={styles.buttonsFallbackFieldLabel}>
+                      Temperature
+                    </div>
+                    <InputNumber
+                      min={0}
+                      max={2}
+                      step={0.1}
+                      value={draftAutoReprompt.temperature}
+                      onChange={(value) => {
+                        setDraftAutoReprompt((current) => ({
+                          ...current,
+                          temperature:
+                            typeof value === "number"
+                              ? Math.min(Math.max(value, 0), 2)
+                              : current.temperature,
+                        }));
+                      }}
+                    />
+                  </div>
+                  <div className={styles.captureFallbackFieldGroup}>
+                    <div className={styles.buttonsFallbackFieldLabel}>
+                      Max tokens
+                    </div>
+                    <InputNumber
+                      min={1}
+                      max={4000}
+                      value={draftAutoReprompt.maxTokens}
+                      onChange={(value) => {
+                        setDraftAutoReprompt((current) => ({
+                          ...current,
+                          maxTokens:
+                            typeof value === "number"
+                              ? Math.max(Math.floor(value), 1)
+                              : current.maxTokens,
+                        }));
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className={styles.captureFallbackFieldGroup}>
+                  <div className={styles.buttonsFallbackFieldLabel}>
+                    System prompt
+                  </div>
+                  <Input.TextArea
+                    value={draftAutoReprompt.systemPrompt}
+                    autoSize={{ minRows: 2, maxRows: 6 }}
+                    placeholder="Provide guidance for reprompts"
+                    onChange={(event) => {
+                      const { value } = event.target;
+                      setDraftAutoReprompt((current) => ({
+                        ...current,
+                        systemPrompt: value,
+                      }));
+                    }}
+                    className={styles.captureFallbackTextarea}
+                  />
+                </div>
+              </div>
+            }
+          >
+            <div
+              className={`${styles.buttonsFallbackItem} ${
+                activePopover === "autoReprompt"
+                  ? styles.buttonsFallbackItemActive
+                  : ""
+              } ${
+                !autoReprompt.enabled && activePopover !== "autoReprompt"
+                  ? styles.buttonsFallbackItemInactive
+                  : ""
+              }`}
+            >
+              <span className={styles.buttonsFallbackItemLabel}>
+                Automatically reprompt
+              </span>
+              <span
+                className={styles.buttonsFallbackSwitch}
+                onClick={(event) => event.stopPropagation()}
+                onMouseDown={(event) => event.stopPropagation()}
+              >
+                <Switch
+                  checked={!!autoReprompt.enabled}
+                  onChange={toggleAutoReprompt}
+                />
+              </span>
+            </div>
+          </Popover>
+        )}
+
+        <div
+          className={`${styles.buttonsFallbackItem} ${
+            !listenForOtherTriggers ? styles.buttonsFallbackItemInactive : ""
+          } ${styles.buttonsFallbackItemStatic}`}
+        >
+          <span className={styles.buttonsFallbackItemLabel}>
+            Listen for other triggers
+          </span>
+          <span
+            className={styles.buttonsFallbackSwitch}
+            onClick={(event) => event.stopPropagation()}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <Switch
+              checked={listenForOtherTriggers}
+              onChange={onListenForOtherTriggersChange}
             />
           </span>
         </div>
@@ -2793,25 +3147,35 @@ export default function PropertiesPanel({
       handleUpdateNodeBatch({ listenForOtherTriggers: checked });
     };
 
-    const updateNoReply = (patch: Partial<CaptureNoReplyConfig>) => {
-      setNoReplyState((current) => {
-        const next = { ...current, ...patch };
-        handleUpdateNodeBatch({ noReply: serializeNoReplyConfig(next) });
-        return next;
-      });
-    };
-
-    const updateAutoReprompt = (
-      patch: Partial<CaptureAutoRepromptConfig>
-    ) => {
-      setAutoRepromptState((current) => {
-        const next = { ...current, ...patch };
-        handleUpdateNodeBatch({
-          autoReprompt: serializeAutoRepromptConfig(next),
+    const commitNoReplyConfig = useCallback(
+      (next: CaptureNoReplyConfig) => {
+        const ensured = ensureNoReplyConfig(next);
+        setNoReplyState((current) => {
+          if (!captureNoReplyEqual(current, ensured)) {
+            handleUpdateNodeBatch({
+              noReply: serializeNoReplyConfig(ensured),
+            });
+          }
+          return ensured;
         });
-        return next;
-      });
-    };
+      },
+      [handleUpdateNodeBatch]
+    );
+
+    const commitAutoRepromptConfig = useCallback(
+      (next: CaptureAutoRepromptConfig) => {
+        const ensured = ensureAutoRepromptConfig(next);
+        setAutoRepromptState((current) => {
+          if (!captureAutoRepromptEqual(current, ensured)) {
+            handleUpdateNodeBatch({
+              autoReprompt: serializeAutoRepromptConfig(ensured),
+            });
+          }
+          return ensured;
+        });
+      },
+      [handleUpdateNodeBatch]
+    );
 
     const addRule = () => {
       setRules((current) => {
@@ -2987,112 +3351,15 @@ export default function PropertiesPanel({
         )}
 
         <div className={styles.captureSection}>
-          <div className={styles.captureToggleCard}>
-            <div className={styles.captureToggleHeader}>
-              <div>
-                <div className={styles.sectionTitle}>No Reply</div>
-                <div className={styles.captureToggleDescription}>
-                  Automatically reprompt the user if they do not respond in
-                  time.
-                </div>
-              </div>
-              <Switch
-                checked={noReplyState.enabled}
-                onChange={(checked) => updateNoReply({ enabled: checked })}
-              />
-            </div>
-            {noReplyState.enabled && (
-              <div className={styles.captureInlineInputs}>
-                <InputNumber
-                  min={1}
-                  max={120}
-                  value={noReplyState.timeout}
-                  addonAfter="s"
-                  onChange={(value) =>
-                    updateNoReply({ timeout: Number(value) || 1 })
-                  }
-                />
-                <Input.TextArea
-                  value={noReplyState.prompt}
-                  autoSize={{ minRows: 2, maxRows: 4 }}
-                  placeholder="Reprompt message"
-                  onChange={(event) =>
-                    updateNoReply({ prompt: event.target.value })
-                  }
-                />
-              </div>
-            )}
-          </div>
-
-          <div className={styles.captureToggleCard}>
-            <div className={styles.captureToggleHeader}>
-              <div>
-                <div className={styles.sectionTitle}>Listen for other triggers</div>
-                <div className={styles.captureToggleDescription}>
-                  Allow intents outside of this capture to interrupt.
-                </div>
-              </div>
-              <Switch
-                checked={listenForOtherTriggersState}
-                onChange={toggleListenForOtherTriggers}
-              />
-            </div>
-          </div>
-
-          {captureMode === "entities" && (
-            <div className={styles.captureToggleCard}>
-              <div className={styles.captureToggleHeader}>
-                <div>
-                  <div className={styles.sectionTitle}>Automatically reprompt</div>
-                  <div className={styles.captureToggleDescription}>
-                    Generate follow-up questions if required entities are
-                    missing.
-                  </div>
-                </div>
-                <Switch
-                  checked={autoRepromptState.enabled}
-                  onChange={(checked) =>
-                    updateAutoReprompt({ enabled: checked })
-                  }
-                />
-              </div>
-              {autoRepromptState.enabled && (
-                <div className={styles.captureSection}>
-                  <div className={styles.captureInlineInputs}>
-                    <InputNumber
-                      min={0}
-                      max={2}
-                      step={0.1}
-                      value={autoRepromptState.temperature}
-                      onChange={(value) =>
-                        updateAutoReprompt({ temperature: Number(value) || 0 })
-                      }
-                      placeholder="Temperature"
-                    />
-                    <InputNumber
-                      min={1}
-                      max={4000}
-                      value={autoRepromptState.maxTokens}
-                      onChange={(value) =>
-                        updateAutoReprompt({ maxTokens: Number(value) || 1 })
-                      }
-                      placeholder="Max tokens"
-                    />
-                  </div>
-                  <Input.TextArea
-                    value={autoRepromptState.systemPrompt}
-                    autoSize={{ minRows: 2, maxRows: 6 }}
-                    placeholder="System prompt"
-                    onChange={(event) =>
-                      updateAutoReprompt({
-                        systemPrompt: event.target.value,
-                      })
-                    }
-                  />
-                </div>
-              )}
-            </div>
-          )}
+          <CaptureFallbackSettings
+            noReply={noReplyState}
+            onChangeNoReply={commitNoReplyConfig}
+            autoReprompt={autoRepromptState}
+            onChangeAutoReprompt={commitAutoRepromptConfig}
+            listenForOtherTriggers={listenForOtherTriggersState}
+            onListenForOtherTriggersChange={toggleListenForOtherTriggers}
+            showAutoReprompt={captureMode === "entities"}
+          />
         </div>
 
         {captureMode === "entities" && (

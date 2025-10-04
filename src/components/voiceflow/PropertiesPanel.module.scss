@@ -2328,3 +2328,29 @@
 .captureAddRowButton {
   align-self: flex-start;
 }
+
+.captureFallbackFieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.captureFallbackFieldGroup :global(.ant-input-number),
+.captureFallbackFieldGroup :global(.ant-input) {
+  width: 100%;
+}
+
+.captureFallbackTextarea {
+  width: 100%;
+}
+
+.captureAutoRepromptFields {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.captureAutoRepromptFields > .captureFallbackFieldGroup {
+  flex: 1;
+  min-width: 140px;
+}
