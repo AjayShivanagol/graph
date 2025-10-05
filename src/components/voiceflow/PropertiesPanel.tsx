@@ -78,8 +78,8 @@ const CONDITION_OPERATOR_SELECT_OPTIONS = CONDITION_OPERATORS.map((option) => ({
   label: option.label,
 }));
 
-const PROMPT_VARIANT_POPOVER_Z_INDEX = 65000;
-const PROMPT_VARIANT_OPERATOR_DROPDOWN_Z_INDEX = 2147483647;
+const PROMPT_VARIANT_POPOVER_Z_INDEX = 999999;
+const PROMPT_VARIANT_OPERATOR_DROPDOWN_Z_INDEX = 9999999;
 import { useAppSelector, useAppDispatch } from "../../store/hooks";
 import {
   updateNode,
@@ -4999,19 +4999,6 @@ export default function PropertiesPanel({
             placeholder="Enter your message..."
           />
         </Form.Item>
-        <Form.Item label="Message delay (ms)">
-          <InputNumber
-            min={0}
-            step={100}
-            value={localDelay}
-            onChange={handleDelayChange}
-            style={{ width: "100%" }}
-          />
-        </Form.Item>
-        <Typography.Text className={styles.helperText}>
-          Add a typing delay before the message is sent. Use milliseconds, e.g.
-          500 for half a second.
-        </Typography.Text>
 
         <div className={styles.variantsSection}>
           <div className={styles.variantsHeader}>
@@ -5255,14 +5242,7 @@ export default function PropertiesPanel({
                                             className={styles.promptReturnOperator}
                                             popupMatchSelectWidth={false}
                                             dropdownStyle={{
-                                              zIndex:
-                                                PROMPT_VARIANT_OPERATOR_DROPDOWN_Z_INDEX,
-                                            }}
-                                            styles={{
-                                              popup: {
-                                                zIndex:
-                                                  PROMPT_VARIANT_OPERATOR_DROPDOWN_Z_INDEX,
-                                              },
+                                              zIndex: 9999999,
                                             }}
                                             getPopupContainer={() => document.body}
                                             dropdownClassName={
@@ -5289,19 +5269,6 @@ export default function PropertiesPanel({
                                             }
                                             className={styles.promptReturnRemoveButton}
                                             aria-label="Remove return value"
-                                          />
-                                        </div>
-                                        <div className={styles.promptReturnMessage}>
-                                          <TextArea
-                                            value={returnValue.message}
-                                            onChange={(event) =>
-                                              handleUpdatePromptReturnValue(returnValue.id, {
-                                                message: event.target.value,
-                                              })
-                                            }
-                                            placeholder="Enter the message to send when this return value matches"
-                                            autoSize={{ minRows: 3, maxRows: 6 }}
-                                            className={styles.promptReturnTextarea}
                                           />
                                         </div>
                                       </div>

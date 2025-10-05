@@ -876,7 +876,15 @@
 }
 
 .promptReturnOperatorDropdown {
-  z-index: 2147483647 !important;
+  z-index: 9999999 !important;
+}
+
+.promptReturnOperatorDropdown .ant-select-dropdown {
+  z-index: 9999999 !important;
+}
+
+:global(.ant-select-dropdown.promptReturnOperatorDropdown) {
+  z-index: 9999999 !important;
 }
 
 .promptReturnHeader {
@@ -2938,4 +2946,23 @@
 .rulesSectionDivider {
   margin: 20px 0;
   border-color: #f0f0f0;
+}
+
+// Global override for the prompt return operator dropdown to ensure it appears on top
+:global(.ant-select-dropdown) {
+  &.promptReturnOperatorDropdown {
+    z-index: 9999999 !important;
+  }
+}
+
+// Additional global override for any Ant Design Select dropdown in this component
+:global(.ant-select-dropdown-hidden) {
+  z-index: 9999999 !important;
+}
+
+:global(.ant-select-dropdown-placement-bottomLeft),
+:global(.ant-select-dropdown-placement-bottomRight),
+:global(.ant-select-dropdown-placement-topLeft),
+:global(.ant-select-dropdown-placement-topRight) {
+  z-index: 9999999 !important;
 }
