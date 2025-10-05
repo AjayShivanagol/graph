@@ -79,8 +79,7 @@ const CONDITION_OPERATOR_SELECT_OPTIONS = CONDITION_OPERATORS.map((option) => ({
 }));
 
 const PROMPT_VARIANT_POPOVER_Z_INDEX = 65000;
-const PROMPT_VARIANT_OPERATOR_DROPDOWN_Z_INDEX =
-  PROMPT_VARIANT_POPOVER_Z_INDEX + 10;
+const PROMPT_VARIANT_OPERATOR_DROPDOWN_Z_INDEX = 2147483647;
 import { useAppSelector, useAppDispatch } from "../../store/hooks";
 import {
   updateNode,
@@ -5258,6 +5257,12 @@ export default function PropertiesPanel({
                                             dropdownStyle={{
                                               zIndex:
                                                 PROMPT_VARIANT_OPERATOR_DROPDOWN_Z_INDEX,
+                                            }}
+                                            styles={{
+                                              popup: {
+                                                zIndex:
+                                                  PROMPT_VARIANT_OPERATOR_DROPDOWN_Z_INDEX,
+                                              },
                                             }}
                                             getPopupContainer={() => document.body}
                                             dropdownClassName={
