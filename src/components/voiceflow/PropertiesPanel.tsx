@@ -77,6 +77,10 @@ const CONDITION_OPERATOR_SELECT_OPTIONS = CONDITION_OPERATORS.map((option) => ({
   value: option.value,
   label: option.label,
 }));
+
+const PROMPT_VARIANT_POPOVER_Z_INDEX = 65000;
+const PROMPT_VARIANT_OPERATOR_DROPDOWN_Z_INDEX =
+  PROMPT_VARIANT_POPOVER_Z_INDEX + 10;
 import { useAppSelector, useAppDispatch } from "../../store/hooks";
 import {
   updateNode,
@@ -5193,7 +5197,7 @@ export default function PropertiesPanel({
                       trigger="click"
                       open={showPromptPopover}
                       onOpenChange={setShowPromptPopover}
-                      overlayStyle={{ zIndex: 50000 }}
+                      overlayStyle={{ zIndex: PROMPT_VARIANT_POPOVER_Z_INDEX }}
                       getPopupContainer={() => document.body}
                       content={
                         <div className={styles.promptVariantPopover}>
@@ -5251,8 +5255,14 @@ export default function PropertiesPanel({
                                             size="middle"
                                             className={styles.promptReturnOperator}
                                             popupMatchSelectWidth={false}
-                                            dropdownStyle={{ zIndex: 60001 }}
+                                            dropdownStyle={{
+                                              zIndex:
+                                                PROMPT_VARIANT_OPERATOR_DROPDOWN_Z_INDEX,
+                                            }}
                                             getPopupContainer={() => document.body}
+                                            dropdownClassName={
+                                              styles.promptReturnOperatorDropdown
+                                            }
                                           />
                                           <ValueInput
                                             value={returnValue.value}

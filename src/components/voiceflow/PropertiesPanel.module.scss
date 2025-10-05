@@ -875,6 +875,10 @@
   gap: 12px;
 }
 
+.promptReturnOperatorDropdown {
+  z-index: 65010 !important;
+}
+
 .promptReturnHeader {
   display: flex;
   align-items: center;
