@@ -58,6 +58,7 @@ import {
 const { TextArea } = Input;
 import type { MenuProps } from "antd";
 import Editor from "@monaco-editor/react";
+import { nanoid } from "nanoid";
 import VariablePicker from "../common/VariablePicker";
 import IntentPicker from "../common/IntentPicker";
 import EntityPicker from "../common/EntityPicker";
@@ -80,6 +81,7 @@ import {
 } from "../../store/slices/workflowSlice";
 import { showToast } from "../../store/slices/uiSlice";
 import { addEntity, addEntityDetailed } from "../../store/slices/entitiesSlice";
+import type { ConditionRule } from "../../store/slices/conditionBuilderSlice";
 
 // AI Models configuration
 const AI_MODELS = [
@@ -4256,55 +4258,215 @@ export default function PropertiesPanel({
 
   const MessageProperties = () => {
     const PROMPT_VARIANT_PREFIX = "__prompt__:";
-    const isPromptVariant = (value: string) =>
+    const isPromptVariantValue = (value: unknown): value is string =>
       typeof value === "string" && value.startsWith(PROMPT_VARIANT_PREFIX);
     const extractPromptName = (value: string) =>
-      isPromptVariant(value)
-        ? value.slice(PROMPT_VARIANT_PREFIX.length)
-        : value;
+      value.slice(PROMPT_VARIANT_PREFIX.length);
 
-    // State for variant editor popovers
-    const [showVariantCodeEditor, setShowVariantCodeEditor] = useState(false);
-    const [showVariantConditionBuilder, setShowVariantConditionBuilder] =
-      useState(false);
-    const [variantCode, setVariantCode] = useState("");
-    const [variantConditionRules, setVariantConditionRules] = useState<any[]>(
-      []
-    );
-    const [variantConditionMatchType, setVariantConditionMatchType] = useState<
-      "all" | "any"
-    >("all");
+    type MessageVariantType = "condition" | "expression" | "prompt";
+
+    interface ConditionVariant {
+      id: string;
+      type: "condition";
+      text: string;
+      rules: ConditionRule[];
+      matchType: "all" | "any";
+    }
+
+    interface ExpressionVariant {
+      id: string;
+      type: "expression";
+      text: string;
+      expression: string;
+    }
+
+    interface PromptVariant {
+      id: string;
+      type: "prompt";
+      promptId: string;
+    }
+
+    type MessageVariant = ConditionVariant | ExpressionVariant | PromptVariant;
+
+    const normalizeVariants = (raw: unknown): MessageVariant[] => {
+      if (!Array.isArray(raw)) return [];
+
+      return raw
+        .map<MessageVariant | null>((item) => {
+          if (!item) return null;
+
+          if (typeof item === "string") {
+            if (isPromptVariantValue(item)) {
+              return {
+                id: nanoid(),
+                type: "prompt",
+                promptId: extractPromptName(item),
+              };
+            }
+
+            return {
+              id: nanoid(),
+              type: "condition",
+              text: item,
+              rules: [],
+              matchType: "all",
+            };
+          }
+
+          if (typeof item === "object") {
+            const typed = item as Record<string, any>;
+            const ensuredId =
+              typeof typed.id === "string" && typed.id.trim().length > 0
+                ? typed.id
+                : nanoid();
+
+            if (typed.type === "prompt" && typeof typed.promptId === "string") {
+              return {
+                id: ensuredId,
+                type: "prompt",
+                promptId: typed.promptId,
+              };
+            }
+
+            if (typed.type === "condition") {
+              const rulesArray = Array.isArray(typed.rules)
+                ? typed.rules.map((rule: any) => ({
+                    id:
+                      typeof rule?.id === "string" && rule.id.trim().length > 0
+                        ? rule.id
+                        : nanoid(),
+                    variable:
+                      typeof rule?.variable === "string" ? rule.variable : "",
+                    operator:
+                      typeof rule?.operator === "string" ? rule.operator : "is",
+                    value: typeof rule?.value === "string" ? rule.value : "",
+                  }))
+                : [];
+
+              return {
+                id: ensuredId,
+                type: "condition",
+                text: typeof typed.text === "string" ? typed.text : "",
+                rules: rulesArray,
+                matchType: typed.matchType === "any" ? "any" : "all",
+              };
+            }
+
+            if (typed.type === "expression") {
+              return {
+                id: ensuredId,
+                type: "expression",
+                text: typeof typed.text === "string" ? typed.text : "",
+                expression:
+                  typeof typed.expression === "string" ? typed.expression : "",
+              };
+            }
+
+            if (typeof typed.prompt === "string") {
+              return {
+                id: ensuredId,
+                type: "prompt",
+                promptId: typed.prompt,
+              };
+            }
+
+            if (typeof typed.value === "string") {
+              if (isPromptVariantValue(typed.value)) {
+                return {
+                  id: ensuredId,
+                  type: "prompt",
+                  promptId: extractPromptName(typed.value),
+                };
+              }
+
+              return {
+                id: ensuredId,
+                type: "condition",
+                text: typed.value,
+                rules: [],
+                matchType: "all",
+              };
+            }
+          }
+
+          return null;
+        })
+        .filter((variant): variant is MessageVariant => variant !== null);
+    };
+
     const [localMessageText, setLocalMessageText] = useState<string>(
       selectedNode.data.text || ""
     );
-    const [variants, setVariants] = useState<string[]>(
-      selectedNode.data.variants || []
+    const [localDelay, setLocalDelay] = useState<number>(
+      typeof selectedNode.data.delay === "number" ? selectedNode.data.delay : 0
+    );
+    const [variants, setVariants] = useState<MessageVariant[]>(() =>
+      normalizeVariants(selectedNode.data.variants)
     );
     const [showVariantsEditor, setShowVariantsEditor] = useState(false);
-    const [variantInput, setVariantInput] = useState("");
-    const [editingVariantIndex, setEditingVariantIndex] = useState<
-      number | null
-    >(null);
-    const [editingVariantValue, setEditingVariantValue] = useState("");
-    const [promptVariantSelection, setPromptVariantSelection] = useState("");
-    // Popover for variant type selection
-    const [showVariantTypePopover, setShowVariantTypePopover] = useState(false);
-    const [variantType, setVariantType] = useState<
-      "condition" | "expression" | "prompt"
-    >("prompt");
+    const [variantType, setVariantType] = useState<MessageVariantType>(
+      "prompt"
+    );
     const [variantEditorValue, setVariantEditorValue] = useState("");
+    const [variantConditionRules, setVariantConditionRules] = useState<
+      ConditionRule[]
+    >([]);
+    const [variantConditionMatchType, setVariantConditionMatchType] = useState<
+      "all" | "any"
+    >("all");
+    const [variantCode, setVariantCode] = useState("");
+    const [promptVariantSelection, setPromptVariantSelection] = useState("");
+    const [editingVariantId, setEditingVariantId] = useState<string | null>(
+      null
+    );
+    const [showVariantTypePopover, setShowVariantTypePopover] =
+      useState(false);
     const [showPromptPopover, setShowPromptPopover] = useState(false);
+    const [showConditionBuilder, setShowConditionBuilder] = useState(false);
+    const [showExpressionEditor, setShowExpressionEditor] = useState(false);
 
     useEffect(() => {
       setLocalMessageText(selectedNode.data.text || "");
-      setVariants(selectedNode.data.variants || []);
-      setPromptVariantSelection("");
-      setEditingVariantIndex(null);
-      setEditingVariantValue("");
-      setVariantEditorValue("");
+      setLocalDelay(
+        typeof selectedNode.data.delay === "number" ? selectedNode.data.delay : 0
+      );
+      const normalized = normalizeVariants(selectedNode.data.variants);
+      setVariants(normalized);
+
+      const hasLegacyVariants = Array.isArray(selectedNode.data.variants)
+        ? selectedNode.data.variants.some((item: any) => {
+            if (!item) return false;
+            if (typeof item === "string") return true;
+            if (typeof item !== "object") return false;
+            return (
+              typeof item.type !== "string" ||
+              (item.type === "prompt" && typeof item.promptId !== "string")
+            );
+          })
+        : false;
+
+      if (hasLegacyVariants && normalized.length > 0) {
+        handleUpdateNode("variants", normalized);
+      }
+
       setVariantType("prompt");
+      setVariantEditorValue("");
+      setVariantConditionRules([]);
+      setVariantConditionMatchType("all");
+      setVariantCode("");
+      setPromptVariantSelection("");
+      setEditingVariantId(null);
+      setShowVariantTypePopover(false);
       setShowPromptPopover(false);
-    }, [selectedNodeId, selectedNode.data.variants]);
+      setShowConditionBuilder(false);
+      setShowExpressionEditor(false);
+      setShowVariantsEditor(false);
+    }, [
+      selectedNodeId,
+      selectedNode.data.text,
+      selectedNode.data.delay,
+      selectedNode.data.variants,
+    ]);
 
     const commitMessageText = () => {
       if ((selectedNode.data.text || "") !== localMessageText) {
@@ -4314,107 +4476,305 @@ export default function PropertiesPanel({
 
     const handleRichTextChange = (value: string) => {
       setLocalMessageText(value);
-      // Don't auto-commit on change - only on blur
     };
 
     const handleRichTextBlur = () => {
-      // Only commit when user clicks outside (blur event)
       if ((selectedNode.data.text || "") !== localMessageText) {
         handleUpdateNode("text", localMessageText);
       }
     };
 
-    // Variants logic
-    const handleVariantEditorChange = (value: string) => {
-      if (editingVariantIndex !== null) {
-        setEditingVariantValue(value);
-      } else {
-        setVariantEditorValue(value);
+    const handleDelayChange = (value: number | null) => {
+      const sanitized = Math.max(0, Math.round(value ?? 0));
+      setLocalDelay(sanitized);
+      if ((selectedNode.data.delay ?? 0) !== sanitized) {
+        handleUpdateNode("delay", sanitized);
       }
     };
-    const handleVariantEditorBlur = () => {
-      // Do nothing on blur
-    };
-    const handleAddVariant = () => {
-      if (variantType === "prompt") {
-        const selectedPrompt = promptVariantSelection.trim();
-        if (!selectedPrompt) return;
 
-        const promptValue = `${PROMPT_VARIANT_PREFIX}${selectedPrompt}`;
-        if (editingVariantIndex !== null) {
-          const newVariants = [...variants];
-          newVariants[editingVariantIndex] = promptValue;
-          setVariants(newVariants);
-          handleUpdateNode("variants", newVariants);
-          setEditingVariantIndex(null);
-          setEditingVariantValue("");
-        } else {
-          const newVariants = [...variants, promptValue];
-          setVariants(newVariants);
-          handleUpdateNode("variants", newVariants);
-        }
-        setPromptVariantSelection("");
-        setShowPromptPopover(false);
-        setShowVariantsEditor(false);
-        return;
-      }
-
-      const valueToAdd =
-        editingVariantIndex !== null ? editingVariantValue : variantEditorValue;
-      const trimmedValue = valueToAdd.trim();
-      if (!trimmedValue) return;
-
-      if (editingVariantIndex !== null) {
-        const newVariants = [...variants];
-        newVariants[editingVariantIndex] = trimmedValue;
-        setVariants(newVariants);
-        handleUpdateNode("variants", newVariants);
-        setEditingVariantIndex(null);
-        setEditingVariantValue("");
-      } else {
-        const newVariants = [...variants, trimmedValue];
-        setVariants(newVariants);
-        handleUpdateNode("variants", newVariants);
-        setVariantEditorValue("");
-      }
-      setShowPromptPopover(false);
-      setShowVariantsEditor(false);
-    };
-    const handleRemoveVariant = (idx: number) => {
-      const newVariants = variants.filter((_, i) => i !== idx);
-      setVariants(newVariants);
-      handleUpdateNode("variants", newVariants);
-    };
-    const handleEditVariant = (idx: number, currentValue: string) => {
-      setEditingVariantIndex(idx);
-      if (isPromptVariant(currentValue)) {
-        setVariantType("prompt");
-        setPromptVariantSelection(extractPromptName(currentValue));
-        setEditingVariantValue("");
-        setVariantEditorValue("");
-        setShowPromptPopover(true);
-      } else {
-        setVariantType("expression");
-        setEditingVariantValue(currentValue);
-        setVariantEditorValue(currentValue);
-        setPromptVariantSelection("");
-        setShowPromptPopover(false);
-      }
+    const startVariantCreation = (initialType: MessageVariantType = "prompt") => {
+      setVariantType(initialType);
+      setVariantEditorValue("");
+      setVariantConditionRules([]);
+      setVariantConditionMatchType("all");
+      setVariantCode("");
+      setPromptVariantSelection("");
+      setEditingVariantId(null);
+      setShowVariantTypePopover(false);
+      setShowPromptPopover(initialType === "prompt");
+      setShowConditionBuilder(initialType === "condition");
+      setShowExpressionEditor(initialType === "expression");
       setShowVariantsEditor(true);
     };
-    const handleCancelEdit = () => {
-      setEditingVariantIndex(null);
-      setEditingVariantValue("");
-      setVariantEditorValue("");
-      setPromptVariantSelection("");
+
+    const handleVariantTypeChange = (type: MessageVariantType) => {
+      setVariantType(type);
+      setShowVariantTypePopover(false);
+      if (type === "prompt") {
+        setVariantEditorValue("");
+        setVariantConditionRules([]);
+        setVariantConditionMatchType("all");
+        setVariantCode("");
+        setShowPromptPopover(true);
+        setShowConditionBuilder(false);
+        setShowExpressionEditor(false);
+      } else if (type === "condition") {
+        setPromptVariantSelection("");
+        setVariantCode("");
+        setShowPromptPopover(false);
+        setShowConditionBuilder(true);
+        setShowExpressionEditor(false);
+      } else {
+        setPromptVariantSelection("");
+        setVariantConditionRules([]);
+        setVariantConditionMatchType("all");
+        setShowPromptPopover(false);
+        setShowConditionBuilder(false);
+        setShowExpressionEditor(true);
+      }
+    };
+
+    const handleVariantEditorChange = (value: string) => {
+      setVariantEditorValue(value);
+    };
+
+    const persistVariants = (updater: (current: MessageVariant[]) => MessageVariant[]) => {
+      setVariants((current) => {
+        const next = updater(current);
+        handleUpdateNode("variants", next);
+        return next;
+      });
+    };
+
+    const handleSaveVariant = () => {
+      let nextVariant: MessageVariant | null = null;
+
+      if (variantType === "prompt") {
+        const promptId = promptVariantSelection.trim();
+        if (!promptId) return;
+        nextVariant = {
+          id: editingVariantId ?? nanoid(),
+          type: "prompt",
+          promptId,
+        };
+      } else if (variantType === "condition") {
+        const content = variantEditorValue.trim();
+        if (!content || variantConditionRules.length === 0) {
+          return;
+        }
+        nextVariant = {
+          id: editingVariantId ?? nanoid(),
+          type: "condition",
+          text: content,
+          rules: variantConditionRules,
+          matchType: variantConditionMatchType,
+        };
+      } else if (variantType === "expression") {
+        const content = variantEditorValue.trim();
+        const expression = variantCode.trim();
+        if (!content || !expression) {
+          return;
+        }
+        nextVariant = {
+          id: editingVariantId ?? nanoid(),
+          type: "expression",
+          text: content,
+          expression,
+        };
+      }
+
+      if (!nextVariant) return;
+
+      persistVariants((current) => {
+        const index = editingVariantId
+          ? current.findIndex((item) => item.id === editingVariantId)
+          : -1;
+
+        if (index >= 0) {
+          const updated = [...current];
+          updated[index] = nextVariant as MessageVariant;
+          return updated;
+        }
+
+        return [...current, nextVariant as MessageVariant];
+      });
+
       setVariantType("prompt");
+      setVariantEditorValue("");
+      setVariantConditionRules([]);
+      setVariantConditionMatchType("all");
+      setVariantCode("");
+      setPromptVariantSelection("");
+      setEditingVariantId(null);
       setShowPromptPopover(false);
+      setShowConditionBuilder(false);
+      setShowExpressionEditor(false);
       setShowVariantsEditor(false);
     };
+
+    const handleCancelEdit = () => {
+      setVariantType("prompt");
+      setVariantEditorValue("");
+      setVariantConditionRules([]);
+      setVariantConditionMatchType("all");
+      setVariantCode("");
+      setPromptVariantSelection("");
+      setEditingVariantId(null);
+      setShowPromptPopover(false);
+      setShowConditionBuilder(false);
+      setShowExpressionEditor(false);
+      setShowVariantsEditor(false);
+    };
+
+    const handleEditVariant = (variantId: string) => {
+      const variant = variants.find((item) => item.id === variantId);
+      if (!variant) return;
+
+      setEditingVariantId(variant.id);
+      setShowVariantsEditor(true);
+      setShowVariantTypePopover(false);
+
+      if (variant.type === "prompt") {
+        setVariantType("prompt");
+        setPromptVariantSelection(variant.promptId);
+        setVariantEditorValue("");
+        setVariantConditionRules([]);
+        setVariantConditionMatchType("all");
+        setVariantCode("");
+        setShowPromptPopover(false);
+        setShowConditionBuilder(false);
+        setShowExpressionEditor(false);
+      } else if (variant.type === "condition") {
+        setVariantType("condition");
+        setVariantEditorValue(variant.text);
+        setVariantConditionRules(variant.rules);
+        setVariantConditionMatchType(variant.matchType);
+        setPromptVariantSelection("");
+        setVariantCode("");
+        setShowPromptPopover(false);
+        setShowConditionBuilder(false);
+        setShowExpressionEditor(false);
+      } else {
+        setVariantType("expression");
+        setVariantEditorValue(variant.text);
+        setVariantCode(variant.expression);
+        setPromptVariantSelection("");
+        setVariantConditionRules([]);
+        setVariantConditionMatchType("all");
+        setShowPromptPopover(false);
+        setShowConditionBuilder(false);
+        setShowExpressionEditor(false);
+      }
+    };
+
+    const handleRemoveVariant = (variantId: string) => {
+      persistVariants((current) =>
+        current.filter((variant) => variant.id !== variantId)
+      );
+
+      if (editingVariantId === variantId) {
+        handleCancelEdit();
+      }
+    };
+
+    const canSaveVariant = useMemo(() => {
+      if (variantType === "prompt") {
+        return promptVariantSelection.trim().length > 0;
+      }
+
+      if (variantType === "condition") {
+        return (
+          variantEditorValue.trim().length > 0 &&
+          variantConditionRules.length > 0
+        );
+      }
+
+      if (variantType === "expression") {
+        return (
+          variantEditorValue.trim().length > 0 && variantCode.trim().length > 0
+        );
+      }
+
+      return false;
+    }, [
+      promptVariantSelection,
+      variantType,
+      variantEditorValue,
+      variantConditionRules,
+      variantCode,
+    ]);
+
+    const formatVariantTypeLabel = (type: MessageVariantType) => {
+      switch (type) {
+        case "condition":
+          return "Condition";
+        case "expression":
+          return "Expression";
+        case "prompt":
+        default:
+          return "Prompt";
+      }
+    };
+
+    const ellipsize = (value: string, max: number = 80) =>
+      value.length > max ? `${value.slice(0, max - 1)}…` : value;
+
+    const getVariantPrimaryText = (variant: MessageVariant) => {
+      if (variant.type === "prompt") {
+        return variant.promptId;
+      }
+      return ellipsize(variant.text || "(empty message)");
+    };
+
+    const getVariantSecondaryText = (variant: MessageVariant) => {
+      if (variant.type === "prompt") {
+        return "Reuses prompt content";
+      }
+
+      if (variant.type === "condition") {
+        if (variant.rules.length === 0) {
+          return "No conditions configured yet";
+        }
+        const count = variant.rules.length;
+        const plural = count === 1 ? "condition" : "conditions";
+        const matchLabel =
+          variant.matchType === "all" ? "Match all" : "Match any";
+        return `${matchLabel} • ${count} ${plural}`;
+      }
+
+      return variant.expression.trim().length > 0
+        ? "Expression configured"
+        : "No expression configured";
+    };
+
+    const variantLogicSummary = useMemo(() => {
+      if (variantType === "condition") {
+        if (variantConditionRules.length === 0) {
+          return "Add at least one condition to use this variant.";
+        }
+        const count = variantConditionRules.length;
+        const plural = count === 1 ? "condition" : "conditions";
+        const matchLabel =
+          variantConditionMatchType === "all" ? "Match all" : "Match any";
+        return `${matchLabel} • ${count} ${plural}`;
+      }
+
+      if (variantType === "expression") {
+        return variantCode.trim().length > 0
+          ? "Expression configured"
+          : "Add a JavaScript expression to determine when this variant is used.";
+      }
+
+      return "";
+    }, [
+      variantType,
+      variantConditionRules,
+      variantConditionMatchType,
+      variantCode,
+    ]);
 
     return (
       <Form layout="vertical">
-        {/* Message Text Section */}
         <Form.Item label="Message">
           <RichTextEditor
             value={localMessageText}
@@ -4423,7 +4783,20 @@ export default function PropertiesPanel({
             placeholder="Enter your message..."
           />
         </Form.Item>
-        {/* Variants Section */}
+        <Form.Item label="Message delay (ms)">
+          <InputNumber
+            min={0}
+            step={100}
+            value={localDelay}
+            onChange={handleDelayChange}
+            style={{ width: "100%" }}
+          />
+        </Form.Item>
+        <Typography.Text className={styles.helperText}>
+          Add a typing delay before the message is sent. Use milliseconds, e.g.
+          500 for half a second.
+        </Typography.Text>
+
         <div className={styles.variantsSection}>
           <div className={styles.variantsHeader}>
             <span className={styles.variantsTitle}>Variants</span>
@@ -4434,29 +4807,17 @@ export default function PropertiesPanel({
                 className={styles.variantsAddButton}
                 onClick={() => {
                   if (showVariantsEditor) {
-                    setShowVariantsEditor(false);
-                    setEditingVariantIndex(null);
-                    setEditingVariantValue("");
-                    setVariantEditorValue("");
-                    setPromptVariantSelection("");
-                    setShowPromptPopover(false);
-                    setVariantType("prompt");
+                    handleCancelEdit();
                     return;
                   }
-
-                  setEditingVariantIndex(null);
-                  setEditingVariantValue("");
-                  setVariantEditorValue("");
-                  setPromptVariantSelection("");
-                  setVariantType("prompt");
-                  setShowPromptPopover(true);
-                  setShowVariantsEditor(true);
+                  startVariantCreation("prompt");
                 }}
               >
                 +
               </button>
             </span>
           </div>
+
           {showVariantsEditor && (
             <div className={styles.variantEditorBox}>
               <div className={styles.variantTypeSelectorRow}>
@@ -4465,17 +4826,13 @@ export default function PropertiesPanel({
                   content={
                     <div className={styles.variantTypePopoverContent}>
                       <div className={styles.variantTypePopoverLabel}>
-                        Select variant type
+                        Variant logic
                       </div>
                       <Button
                         type={variantType === "condition" ? "primary" : "text"}
                         block
                         className={styles.variantTypePopoverButton}
-                        onClick={() => {
-                          setVariantType("condition");
-                          setShowPromptPopover(false);
-                          setShowVariantTypePopover(false);
-                        }}
+                        onClick={() => handleVariantTypeChange("condition")}
                       >
                         Condition builder
                       </Button>
@@ -4483,11 +4840,7 @@ export default function PropertiesPanel({
                         type={variantType === "expression" ? "primary" : "text"}
                         block
                         className={styles.variantTypePopoverButton}
-                        onClick={() => {
-                          setVariantType("expression");
-                          setShowPromptPopover(false);
-                          setShowVariantTypePopover(false);
-                        }}
+                        onClick={() => handleVariantTypeChange("expression")}
                       >
                         Expression
                       </Button>
@@ -4495,11 +4848,7 @@ export default function PropertiesPanel({
                         type={variantType === "prompt" ? "primary" : "text"}
                         block
                         className={styles.variantTypePopoverButton}
-                        onClick={() => {
-                          setVariantType("prompt");
-                          setShowPromptPopover(true);
-                          setShowVariantTypePopover(false);
-                        }}
+                        onClick={() => handleVariantTypeChange("prompt")}
                       >
                         Prompt
                       </Button>
@@ -4516,127 +4865,109 @@ export default function PropertiesPanel({
                     className={styles.variantTypeSelectorButton}
                     onClick={() => setShowVariantTypePopover(true)}
                   >
-                    {variantType.charAt(0).toUpperCase() + variantType.slice(1)}
+                    {formatVariantTypeLabel(variantType)}
                   </Button>
                 </Popover>
-              </div>
-              {/* Popover for ConditionBuilder */}
-              <Popover
-                placement="right"
-                trigger="click"
-                open={variantType === "condition"}
-                onOpenChange={(open) => {
-                  if (!open) {
-                    setVariantType("prompt");
-                    setShowPromptPopover(false);
-                  }
-                }}
-                overlayStyle={{ zIndex: 50000 }}
-                getPopupContainer={() => document.body}
-                content={
-                  variantType === "condition" ? (
-                    <div className={styles.variantConditionBuilderPopover}>
-                      <ConditionBuilder
-                        initialRules={variantConditionRules}
-                        matchType={variantConditionMatchType}
-                        onSave={(rules, matchType) => {
-                          setVariantConditionRules(rules);
-                          setVariantConditionMatchType(matchType);
-                          setVariantType("prompt");
-                          setShowPromptPopover(false);
-                        }}
-                        onCancel={() => {
-                          setVariantType("prompt");
-                          setShowPromptPopover(false);
-                        }}
-                      />
-                    </div>
-                  ) : null
-                }
-              >
-                <div />
-              </Popover>
-              {/* Popover for Expression (Monaco) */}
-              <Popover
-                placement="right"
-                trigger="click"
-                open={variantType === "expression"}
-                onOpenChange={(open) => {
-                  if (!open) {
-                    setVariantType("prompt");
-                    setShowPromptPopover(false);
-                  }
-                }}
-                overlayStyle={{ zIndex: 50000 }}
-                getPopupContainer={() => document.body}
-                content={
-                  variantType === "expression" ? (
-                    <div className={styles.variantCodeEditorPopover}>
-                      <Editor
-                        language="javascript"
-                        value={variantCode}
-                        onChange={(value) => setVariantCode(value || "")}
-                        theme="vs-dark"
-                        options={{
-                          minimap: { enabled: false },
-                          scrollBeyondLastLine: false,
-                          fontSize: 14,
-                          lineNumbers: "on",
-                          roundedSelection: false,
-                          automaticLayout: true,
-                          wordWrap: "on",
-                          padding: { top: 10, bottom: 10 },
-                        }}
-                        height="200px"
-                        width="400px"
-                      />
-                      <div className={styles.variantCodeEditorActions}>
-                        <Button
-                          type="primary"
-                          size="small"
-                          onClick={() => {
-                            setVariantType("prompt");
-                            setShowPromptPopover(false);
+
+                {variantType === "condition" && (
+                  <Popover
+                    placement="right"
+                    trigger="click"
+                    open={showConditionBuilder}
+                    onOpenChange={setShowConditionBuilder}
+                    overlayStyle={{ zIndex: 50000 }}
+                    getPopupContainer={() => document.body}
+                    content={
+                      <div className={styles.conditionBuilderContainer}>
+                        <ConditionBuilder
+                          initialRules={variantConditionRules}
+                          matchType={variantConditionMatchType}
+                          onSave={(rules, matchType) => {
+                            setVariantConditionRules(rules);
+                            setVariantConditionMatchType(matchType);
+                            setShowConditionBuilder(false);
                           }}
-                        >
-                          Save
-                        </Button>
-                        <Button
-                          size="small"
-                          onClick={() => {
-                            setVariantType("prompt");
-                            setShowPromptPopover(false);
-                          }}
-                        >
-                          Cancel
-                        </Button>
+                          onCancel={() => setShowConditionBuilder(false)}
+                        />
                       </div>
-                    </div>
-                  ) : null
-                }
-              >
-                <div />
-              </Popover>
-              {/* Default Prompt/Plain text editor */}
+                    }
+                  >
+                    <Button
+                      size="small"
+                      onClick={() => setShowConditionBuilder(true)}
+                    >
+                      {variantConditionRules.length > 0
+                        ? "Edit conditions"
+                        : "Add conditions"}
+                    </Button>
+                  </Popover>
+                )}
+
+                {variantType === "expression" && (
+                  <Popover
+                    placement="right"
+                    trigger="click"
+                    open={showExpressionEditor}
+                    onOpenChange={setShowExpressionEditor}
+                    overlayStyle={{ zIndex: 50000 }}
+                    getPopupContainer={() => document.body}
+                    content={
+                      <div className={styles.variantCodeEditorPopover}>
+                        <Editor
+                          language="javascript"
+                          value={variantCode}
+                          onChange={(value) => setVariantCode(value || "")}
+                          theme="vs-dark"
+                          options={{
+                            minimap: { enabled: false },
+                            scrollBeyondLastLine: false,
+                            fontSize: 14,
+                            lineNumbers: "on",
+                            roundedSelection: false,
+                            automaticLayout: true,
+                            wordWrap: "on",
+                            padding: { top: 10, bottom: 10 },
+                          }}
+                          height="200px"
+                          width="400px"
+                        />
+                        <div className={styles.variantCodeEditorActions}>
+                          <Button
+                            type="primary"
+                            size="small"
+                            onClick={() => setShowExpressionEditor(false)}
+                          >
+                            Done
+                          </Button>
+                        </div>
+                      </div>
+                    }
+                  >
+                    <Button
+                      size="small"
+                      onClick={() => setShowExpressionEditor(true)}
+                    >
+                      {variantCode.trim().length > 0
+                        ? "Edit expression"
+                        : "Add expression"}
+                    </Button>
+                  </Popover>
+                )}
+              </div>
+
               {variantType === "prompt" ? (
                 <Popover
                   placement="right"
                   trigger="click"
-                  open={variantType === "prompt" && showPromptPopover}
-                  onOpenChange={(open) => {
-                    if (variantType === "prompt") {
-                      setShowPromptPopover(open);
-                    }
-                  }}
+                  open={showPromptPopover}
+                  onOpenChange={setShowPromptPopover}
                   overlayStyle={{ zIndex: 50000 }}
                   getPopupContainer={() => document.body}
                   content={
                     <div className={styles.promptVariantPopover}>
                       <PromptPicker
                         value={promptVariantSelection || ""}
-                        onChange={(val) => {
-                          setPromptVariantSelection(val || "");
-                        }}
+                        onChange={(val) => setPromptVariantSelection(val || "")}
                         placeholder="Select prompt"
                         allowCreate
                         size="middle"
@@ -4661,7 +4992,6 @@ export default function PropertiesPanel({
                     type="default"
                     block
                     className={styles.promptVariantSelectButton}
-                    onClick={() => setShowPromptPopover(true)}
                   >
                     {promptVariantSelection
                       ? `Prompt: ${promptVariantSelection}`
@@ -4669,85 +4999,92 @@ export default function PropertiesPanel({
                   </Button>
                 </Popover>
               ) : (
-                <div className={styles.variantTextAreaWrapper}>
-                  <VariantTextEditor
-                    value={
-                      editingVariantIndex !== null
-                        ? editingVariantValue
-                        : variantEditorValue
-                    }
-                    onChange={handleVariantEditorChange}
-                    onBlur={handleVariantEditorBlur}
-                    placeholder={
-                      editingVariantIndex !== null
-                        ? "Edit variant text..."
-                        : "Enter variant text..."
-                    }
-                    rows={3}
-                  />
-                </div>
+                <>
+                  <div className={styles.variantTextAreaWrapper}>
+                    <VariantTextEditor
+                      value={variantEditorValue}
+                      onChange={handleVariantEditorChange}
+                      placeholder="Enter the message to send when this variant matches"
+                      rows={4}
+                    />
+                  </div>
+                  {variantLogicSummary && (
+                    <Typography.Text
+                      type="secondary"
+                      className={styles.variantLogicSummary}
+                    >
+                      {variantLogicSummary}
+                    </Typography.Text>
+                  )}
+                </>
               )}
-              <button
-                type="button"
-                className={styles.variantGenerateButton}
-                onClick={handleAddVariant}
-                disabled={
-                  variantType === "prompt" && !promptVariantSelection.trim()
-                }
-              >
-                {editingVariantIndex !== null
-                  ? `✏️ Update (${
-                      variantType.charAt(0).toUpperCase() + variantType.slice(1)
-                    })`
-                  : `✨ Generate (${
-                      variantType.charAt(0).toUpperCase() + variantType.slice(1)
-                    })`}
-              </button>
-              {editingVariantIndex !== null && (
-                <button
-                  type="button"
-                  className={styles.variantCancelButton}
-                  onClick={handleCancelEdit}
+
+              <div className={styles.variantEditorActions}>
+                <Button onClick={handleCancelEdit}>Cancel</Button>
+                <Button
+                  type="primary"
+                  icon={<SaveOutlined />}
+                  onClick={handleSaveVariant}
+                  disabled={!canSaveVariant}
                 >
-                  Cancel
-                </button>
-              )}
+                  {editingVariantId ? "Update variant" : "Add variant"}
+                </Button>
+              </div>
             </div>
           )}
+
           {variants.length > 0 && (
             <div className={styles.variantList}>
-              {variants.map((variant, idx) => (
-                <div key={idx} className={styles.variantItem}>
-                  <div
-                    className={styles.variantItemContent}
-                    onClick={() => handleEditVariant(idx, variant)}
-                    title="Click to edit"
-                  >
-                    <span className={styles.variantItemText}>
-                      {isPromptVariant(variant)
-                        ? `Prompt: ${extractPromptName(variant)}`
-                        : variant}
-                    </span>
-                    <span className={styles.editIcon}>
-                      <EditOutlined />
-                    </span>
+              {variants.map((variant) => {
+                const primaryText = getVariantPrimaryText(variant);
+                const secondaryText = getVariantSecondaryText(variant);
+                const typeClass =
+                  variant.type === "prompt"
+                    ? styles.variantItemTypePrompt
+                    : variant.type === "condition"
+                    ? styles.variantItemTypeCondition
+                    : styles.variantItemTypeExpression;
+
+                return (
+                  <div key={variant.id} className={styles.variantItem}>
+                    <div
+                      className={styles.variantItemContent}
+                      onClick={() => handleEditVariant(variant.id)}
+                      title="Click to edit"
+                    >
+                      <span className={styles.variantItemText}>
+                        <span className={styles.variantPrimaryText}>
+                          <span className={`${styles.variantItemType} ${typeClass}`}>
+                            {formatVariantTypeLabel(variant.type)}
+                          </span>
+                          {primaryText}
+                        </span>
+                        {secondaryText && (
+                          <span className={styles.variantItemDescription}>
+                            {secondaryText}
+                          </span>
+                        )}
+                      </span>
+                      <span className={styles.editIcon}>
+                        <EditOutlined />
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.variantRemoveButton}
+                      onClick={() => handleRemoveVariant(variant.id)}
+                    >
+                      ×
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    className={styles.variantRemoveButton}
-                    onClick={() => handleRemoveVariant(idx)}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       </Form>
     );
   };
-
   const PromptProperties = () => {
     const [showDescription, setShowDescription] = useState(false); // Collapsed by default
     const [promptEditorOpen, setPromptEditorOpen] = useState(false);

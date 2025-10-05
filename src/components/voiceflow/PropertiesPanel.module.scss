@@ -365,6 +365,13 @@
   margin-bottom: 16px;
 }
 
+.helperText {
+  color: #6b7280;
+  font-size: 12px;
+  margin-top: -8px;
+  margin-bottom: 16px;
+}
+
 .blockNameInput {
   width: 100%;
 }
@@ -835,27 +842,22 @@
   gap: 8px;
 }
 
-.variantGenerateButton {
-  flex: 1;
-  background: #e0eaff;
-  color: #3b82f6;
-  padding: 12px;
-  border-radius: 8px;
-  border: none;
-  font-weight: 600;
-  font-size: 16px;
-  margin-top: 4px;
-  cursor: pointer;
+.variantCodeEditorPopover {
+  width: 420px;
+  max-width: 90vw;
 }
 
-.variantCancelButton {
-  padding: 8px 16px;
-  background: #f5f5f5;
-  color: #666;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
+.variantEditorActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.variantLogicSummary {
+  color: #6b7280;
+  font-size: 12px;
+  margin-top: 6px;
 }
 
 .variantList {
@@ -889,6 +891,48 @@
 
 .variantItemText {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.variantPrimaryText {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  color: #111827;
+}
+
+.variantItemDescription {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.variantItemType {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.variantItemTypeCondition {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.variantItemTypeExpression {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.variantItemTypePrompt {
+  background: #dcfce7;
+  color: #166534;
 }
 
 .editIcon {
