@@ -496,7 +496,7 @@ export default function Sidebar() {
       )}
 
       {/* Entity Button */}
-      <div style={{ padding: 16, borderTop: "1px solid #f0f0f0" }}>
+      {/* <div style={{ padding: 16, borderTop: "1px solid #f0f0f0" }}>
         <Button
           block
           icon={<PlusOutlined />}
@@ -509,7 +509,7 @@ export default function Sidebar() {
         >
           Entity
         </Button>
-      </div>
+      </div> */}
     </div>
   );
 }
