@@ -5251,6 +5251,8 @@ export default function PropertiesPanel({
                                             size="middle"
                                             className={styles.promptReturnOperator}
                                             popupMatchSelectWidth={false}
+                                            dropdownStyle={{ zIndex: 60001 }}
+                                            getPopupContainer={() => document.body}
                                           />
                                           <ValueInput
                                             value={returnValue.value}
@@ -5275,15 +5277,16 @@ export default function PropertiesPanel({
                                           />
                                         </div>
                                         <div className={styles.promptReturnMessage}>
-                                          <RichTextEditor
+                                          <TextArea
                                             value={returnValue.message}
-                                            onChange={(value) =>
+                                            onChange={(event) =>
                                               handleUpdatePromptReturnValue(returnValue.id, {
-                                                message: value,
+                                                message: event.target.value,
                                               })
                                             }
                                             placeholder="Enter the message to send when this return value matches"
-                                            className={`${styles.variantRichTextEditor} ${styles.promptReturnEditor}`}
+                                            autoSize={{ minRows: 3, maxRows: 6 }}
+                                            className={styles.promptReturnTextarea}
                                           />
                                         </div>
                                       </div>
