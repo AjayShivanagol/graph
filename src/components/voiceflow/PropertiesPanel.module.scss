@@ -365,6 +365,13 @@
   margin-bottom: 16px;
 }
 
+.helperText {
+  color: #6b7280;
+  font-size: 12px;
+  margin-top: -8px;
+  margin-bottom: 16px;
+}
+
 .blockNameInput {
   width: 100%;
 }
@@ -821,13 +828,35 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  background: #fff;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    color 0.2s ease;
+}
+
+.promptVariantSelectButton:hover,
+.promptVariantSelectButton:focus {
+  border-color: #1677ff;
+  color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.16);
 }
 
 .promptVariantPopover {
-  width: 260px;
+  width: 420px;
+  max-width: 420px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.promptVariantPopoverContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 440px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .promptVariantPopoverActions {
@@ -835,27 +864,217 @@
   gap: 8px;
 }
 
-.variantGenerateButton {
-  flex: 1;
-  background: #e0eaff;
-  color: #3b82f6;
-  padding: 12px;
+.promptReturnSection {
+  margin-top: 0;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
-  border: none;
-  font-weight: 600;
-  font-size: 16px;
-  margin-top: 4px;
-  cursor: pointer;
+  padding: 12px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.variantCancelButton {
-  padding: 8px 16px;
-  background: #f5f5f5;
-  color: #666;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+.promptReturnOperatorDropdown {
+  z-index: 2147483647 !important;
+}
+
+.promptReturnHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.promptReturnTitle {
+  font-size: 13px;
   font-weight: 600;
+  color: #334155;
+}
+
+.promptReturnAddButton {
+  height: 24px;
+  width: 24px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: #6366f1 !important;
+  background: #f8fafc;
+
+  &:hover {
+    color: #4f46e5 !important;
+    background: #eef2ff !important;
+    border-color: #c7d2fe !important;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+  }
+
+  :global(.anticon) {
+    font-size: 12px;
+  }
+}
+
+.promptReturnEmpty {
+  font-size: 12px;
+  color: #64748b;
+  padding: 8px 0;
+}
+
+.promptReturnDivider {
+  margin: 8px 0;
+  align-self: stretch;
+}
+
+.promptReturnItem {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.promptReturnConditionRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.promptReturnIfLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  min-width: 70px;
+  text-transform: lowercase;
+}
+
+.promptReturnOperator {
+  min-width: 150px;
+
+  :global(.ant-select-selector) {
+    border-radius: 6px;
+  }
+}
+
+.promptReturnValueInput {
+  flex: 1;
+  min-width: 160px;
+}
+
+.promptReturnRemoveButton {
+  margin-left: auto;
+  color: #94a3b8;
+
+  &:hover {
+    color: #ef4444;
+  }
+}
+
+.promptReturnMessage {
+  width: 100%;
+}
+
+.promptReturnTextarea {
+  width: 100%;
+  min-height: 96px;
+}
+
+.promptVariantPreview {
+  margin-top: 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+  min-height: 120px;
   cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+  display: flex;
+  align-items: flex-start;
+  justify-content: stretch;
+}
+
+.promptVariantPreview:hover {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
+}
+
+.promptVariantPreviewActive,
+.promptVariantPreview:focus-within {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.16);
+}
+
+.promptVariantPreviewContent {
+  width: 100%;
+  color: #0f172a;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.promptVariantPreviewContent :global(strong) {
+  font-weight: 600;
+}
+
+.promptVariantPreviewContent :global(.underline) {
+  text-decoration: underline;
+}
+
+.promptVariantPreviewContent :global(.strike) {
+  text-decoration: line-through;
+}
+
+.promptVariantPreviewPlaceholder {
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.variantRichTextEditor {
+  margin-top: 4px;
+}
+
+.variantCodeEditorPopover {
+  width: 420px;
+  max-width: 90vw;
+}
+
+.variantCodeEditorHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.variantCodeEditor {
+  border: 1px solid #0f172a;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.variantCodeEditorHint {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.variantEditorActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.variantLogicSummary {
+  color: #6b7280;
+  font-size: 12px;
+  margin-top: 6px;
 }
 
 .variantList {
@@ -889,6 +1108,48 @@
 
 .variantItemText {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.variantPrimaryText {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  color: #111827;
+}
+
+.variantItemDescription {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.variantItemType {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.variantItemTypeCondition {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.variantItemTypeExpression {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.variantItemTypePrompt {
+  background: #dcfce7;
+  color: #166534;
 }
 
 .editIcon {

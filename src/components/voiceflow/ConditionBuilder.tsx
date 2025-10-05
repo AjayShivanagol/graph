@@ -1,5 +1,5 @@
 import React from 'react';
-import { Select, Input, Button } from 'antd';
+import { Select, Button } from 'antd';
 import { PlusOutlined, CloseOutlined } from '@ant-design/icons';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store/store';
@@ -15,6 +15,7 @@ import {
 import VariablePicker from '../common/VariablePicker';
 import ValueInput from '../common/ValueInput';
 import styles from './ConditionBuilder.module.scss';
+import { CONDITION_OPERATORS } from './conditionOperators';
 
 const { Option } = Select;
 
@@ -27,24 +28,7 @@ interface ConditionBuilderProps {
   onCancel?: () => void;
 }
 
-const operators = [
-  { value: 'is', label: 'is' },
-  { value: 'is_not', label: 'is not' },
-  { value: 'greater_than', label: 'greater than' },
-  { value: 'greater_or_equal', label: 'greater or equal' },
-  { value: 'less_than', label: 'less than' },
-  { value: 'less_or_equal', label: 'less or equal' },
-  { value: 'contains', label: 'contains' },
-  { value: 'not_contains', label: 'not contains' },
-  { value: 'starts_with', label: 'starts with' },
-  { value: 'ends_with', label: 'ends with' },
-  { value: 'is_empty', label: 'is empty' },
-  { value: 'is_not_empty', label: 'is not empty' },
-  { value: 'exists', label: 'exists' },
-  { value: 'not_exists', label: 'does not exist' }
-];
-
-const ConditionBuilder: React.FC<ConditionBuilderProps> = ({ 
+const ConditionBuilder: React.FC<ConditionBuilderProps> = ({
   initialRules,
   matchType: initialMatchType,
   onClose,
@@ -196,7 +180,7 @@ const ConditionBuilder: React.FC<ConditionBuilderProps> = ({
                   }
                 }}
               >
-                {operators.map(op => (
+                {CONDITION_OPERATORS.map(op => (
                   <Option key={op.value} value={op.value}>{op.label}</Option>
                 ))}
               </Select>
