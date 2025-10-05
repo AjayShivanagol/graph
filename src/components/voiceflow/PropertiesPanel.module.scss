@@ -916,6 +916,26 @@
   max-width: 90vw;
 }
 
+.variantCodeEditorHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.variantCodeEditor {
+  border: 1px solid #0f172a;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.variantCodeEditorHint {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #64748b;
+}
+
 .variantEditorActions {
   display: flex;
   justify-content: flex-end;

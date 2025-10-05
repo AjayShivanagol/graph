@@ -4414,6 +4414,8 @@ export default function PropertiesPanel({
       "all" | "any"
     >("all");
     const [variantCode, setVariantCode] = useState("");
+    const [showVariantFullScreenEditor, setShowVariantFullScreenEditor] =
+      useState(false);
     const [promptVariantSelection, setPromptVariantSelection] = useState("");
     const [editingVariantId, setEditingVariantId] = useState<string | null>(
       null
@@ -4459,6 +4461,7 @@ export default function PropertiesPanel({
       setShowPromptPopover(false);
       setShowConditionBuilder(false);
       setShowExpressionEditor(false);
+      setShowVariantFullScreenEditor(false);
       setShowVariantsEditor(false);
     }, [
       selectedNodeId,
@@ -4503,6 +4506,7 @@ export default function PropertiesPanel({
       setShowPromptPopover(initialType === "prompt");
       setShowConditionBuilder(initialType === "condition");
       setShowExpressionEditor(initialType === "expression");
+      setShowVariantFullScreenEditor(false);
       setShowVariantsEditor(true);
     };
 
@@ -4517,12 +4521,14 @@ export default function PropertiesPanel({
         setShowPromptPopover(true);
         setShowConditionBuilder(false);
         setShowExpressionEditor(false);
+        setShowVariantFullScreenEditor(false);
       } else if (type === "condition") {
         setPromptVariantSelection("");
         setVariantCode("");
         setShowPromptPopover(false);
         setShowConditionBuilder(true);
         setShowExpressionEditor(false);
+        setShowVariantFullScreenEditor(false);
       } else {
         setPromptVariantSelection("");
         setVariantConditionRules([]);
@@ -4530,6 +4536,7 @@ export default function PropertiesPanel({
         setShowPromptPopover(false);
         setShowConditionBuilder(false);
         setShowExpressionEditor(true);
+        setShowVariantFullScreenEditor(false);
       }
     };
 
@@ -4616,6 +4623,7 @@ export default function PropertiesPanel({
       setShowPromptPopover(false);
       setShowConditionBuilder(false);
       setShowExpressionEditor(false);
+      setShowVariantFullScreenEditor(false);
       setShowVariantsEditor(false);
     };
 
@@ -4630,6 +4638,7 @@ export default function PropertiesPanel({
       setShowPromptPopover(false);
       setShowConditionBuilder(false);
       setShowExpressionEditor(false);
+      setShowVariantFullScreenEditor(false);
       setShowVariantsEditor(false);
     };
 
@@ -4651,6 +4660,7 @@ export default function PropertiesPanel({
         setShowPromptPopover(false);
         setShowConditionBuilder(false);
         setShowExpressionEditor(false);
+        setShowVariantFullScreenEditor(false);
       } else if (variant.type === "condition") {
         setVariantType("condition");
         setVariantEditorValue(variant.text);
@@ -4661,6 +4671,7 @@ export default function PropertiesPanel({
         setShowPromptPopover(false);
         setShowConditionBuilder(false);
         setShowExpressionEditor(false);
+        setShowVariantFullScreenEditor(false);
       } else {
         setVariantType("expression");
         setVariantEditorValue(variant.text);
@@ -4671,7 +4682,22 @@ export default function PropertiesPanel({
         setShowPromptPopover(false);
         setShowConditionBuilder(false);
         setShowExpressionEditor(false);
+        setShowVariantFullScreenEditor(false);
       }
+    };
+
+    const handleVariantFullScreenSave = (code: string) => {
+      setVariantCode(code);
+      setShowVariantFullScreenEditor(false);
+    };
+
+    const handleVariantFullScreenClose = () => {
+      setShowVariantFullScreenEditor(false);
+    };
+
+    const openVariantFullScreenEditor = () => {
+      setShowExpressionEditor(false);
+      setShowVariantFullScreenEditor(true);
     };
 
     const handleRemoveVariant = (variantId: string) => {
@@ -4920,33 +4946,50 @@ export default function PropertiesPanel({
                     getPopupContainer={() => document.body}
                     content={
                       <div className={styles.variantCodeEditorPopover}>
-                        <Editor
-                          language="javascript"
-                          value={variantCode}
-                          onChange={(value) => setVariantCode(value || "")}
-                          theme="vs-dark"
-                          options={{
-                            minimap: { enabled: false },
-                            scrollBeyondLastLine: false,
-                            fontSize: 14,
-                            lineNumbers: "on",
-                            roundedSelection: false,
-                            automaticLayout: true,
-                            wordWrap: "on",
-                            padding: { top: 10, bottom: 10 },
-                          }}
-                          height="200px"
-                          width="400px"
-                        />
-                        <div className={styles.variantCodeEditorActions}>
-                          <Button
-                            type="primary"
-                            size="small"
-                            onClick={() => setShowExpressionEditor(false)}
-                          >
-                            Done
-                          </Button>
+                        <div className={styles.variantCodeEditorHeader}>
+                          <Typography.Text strong>
+                            JavaScript expression
+                          </Typography.Text>
+                          <div className={styles.variantCodeEditorActions}>
+                            <Button
+                              size="small"
+                              icon={<FullscreenOutlined />}
+                              onClick={openVariantFullScreenEditor}
+                              title="Open in fullscreen"
+                            />
+                            <Button
+                              type="primary"
+                              size="small"
+                              onClick={() => setShowExpressionEditor(false)}
+                            >
+                              Done
+                            </Button>
+                          </div>
                         </div>
+                        <div className={styles.variantCodeEditor}>
+                          <Editor
+                            language="javascript"
+                            value={variantCode}
+                            onChange={(value) => setVariantCode(value || "")}
+                            theme="vs-dark"
+                            options={{
+                              minimap: { enabled: false },
+                              scrollBeyondLastLine: false,
+                              fontSize: 14,
+                              lineNumbers: "on",
+                              roundedSelection: false,
+                              automaticLayout: true,
+                              wordWrap: "on",
+                              padding: { top: 10, bottom: 10 },
+                            }}
+                            height="200px"
+                            width="400px"
+                          />
+                        </div>
+                        <Typography.Text className={styles.variantCodeEditorHint}>
+                          Examples: return userInput.length {">"} 0; | return
+                          variables.status === 'active';
+                        </Typography.Text>
                       </div>
                     }
                   >
@@ -5230,6 +5273,16 @@ export default function PropertiesPanel({
             </Form.Item>
           </div>
         </Form>
+
+        <FullScreenCodeEditor
+          visible={showVariantFullScreenEditor}
+          onClose={handleVariantFullScreenClose}
+          onSave={handleVariantFullScreenSave}
+          initialCode={variantCode}
+          title="JavaScript Expression Editor"
+          language="javascript"
+          startFullscreen
+        />
 
         <PromptEditor
           visible={promptEditorOpen}
