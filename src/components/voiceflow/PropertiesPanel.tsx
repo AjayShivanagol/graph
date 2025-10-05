@@ -4708,7 +4708,9 @@ export default function PropertiesPanel({
               message: entry.message.trim(),
             };
           })
-          .filter((entry) => entry.message.length > 0);
+          .filter(
+            (entry) => entry.value.length > 0 || entry.message.length > 0
+          );
 
         nextVariant = {
           id: editingVariantId ?? nanoid(),
@@ -4848,7 +4850,7 @@ export default function PropertiesPanel({
 
     const openVariantFullScreenEditor = () => {
       setShowExpressionEditor(false);
-      setShowVariantFullScreenEditor(true);
+      setTimeout(() => setShowVariantFullScreenEditor(true), 0);
     };
 
     const handleRemoveVariant = (variantId: string) => {
@@ -5269,6 +5271,25 @@ export default function PropertiesPanel({
                                             }
                                             className={styles.promptReturnRemoveButton}
                                             aria-label="Remove return value"
+                                          />
+                                        </div>
+                                        <div className={styles.promptReturnMessage}>
+                                          <Typography.Text
+                                            type="secondary"
+                                            className={styles.promptReturnMessageLabel}
+                                          >
+                                            Message
+                                          </Typography.Text>
+                                          <RichTextEditor
+                                            value={returnValue.message}
+                                            onChange={(value) =>
+                                              handleUpdatePromptReturnValue(
+                                                returnValue.id,
+                                                { message: value }
+                                              )
+                                            }
+                                            placeholder="Enter the message to send when this value matches"
+                                            className={styles.promptReturnTextarea}
                                           />
                                         </div>
                                       </div>

@@ -983,6 +983,15 @@
 
 .promptReturnMessage {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.promptReturnMessageLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
 }
 
 .promptReturnTextarea {
