@@ -854,6 +854,119 @@
   gap: 8px;
 }
 
+.promptReturnSection {
+  margin-top: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.promptReturnHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.promptReturnTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.promptReturnAddButton {
+  height: 24px;
+  width: 24px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: #6366f1 !important;
+  background: #f8fafc;
+
+  &:hover {
+    color: #4f46e5 !important;
+    background: #eef2ff !important;
+    border-color: #c7d2fe !important;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+  }
+
+  :global(.anticon) {
+    font-size: 12px;
+  }
+}
+
+.promptReturnEmpty {
+  font-size: 12px;
+  color: #64748b;
+  padding: 8px 0;
+}
+
+.promptReturnDivider {
+  margin: 8px 0;
+  align-self: stretch;
+}
+
+.promptReturnItem {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.promptReturnConditionRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.promptReturnIfLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  min-width: 70px;
+  text-transform: lowercase;
+}
+
+.promptReturnOperator {
+  min-width: 150px;
+
+  :global(.ant-select-selector) {
+    border-radius: 6px;
+  }
+}
+
+.promptReturnValueInput {
+  flex: 1;
+  min-width: 160px;
+}
+
+.promptReturnRemoveButton {
+  margin-left: auto;
+  color: #94a3b8;
+
+  &:hover {
+    color: #ef4444;
+  }
+}
+
+.promptReturnMessage {
+  width: 100%;
+}
+
+.promptReturnEditor {
+  min-height: 96px;
+}
+
 .promptVariantPreview {
   margin-top: 12px;
   border: 1px solid #d9d9d9;

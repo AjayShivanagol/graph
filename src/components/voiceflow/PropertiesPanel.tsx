@@ -70,7 +70,13 @@ import FullScreenCodeEditor from "../common/FullScreenCodeEditor";
 import ApiProperties from "./ApiProperties";
 import KbSearchProperties from "./KbSearchProperties";
 import ConditionBuilder from "./ConditionBuilder";
+import { CONDITION_OPERATORS, ConditionOperatorValue } from "./conditionOperators";
 import styles from "./PropertiesPanel.module.scss";
+
+const CONDITION_OPERATOR_SELECT_OPTIONS = CONDITION_OPERATORS.map((option) => ({
+  value: option.value,
+  label: option.label,
+}));
 import { useAppSelector, useAppDispatch } from "../../store/hooks";
 import {
   updateNode,
@@ -4279,13 +4285,73 @@ export default function PropertiesPanel({
       expression: string;
     }
 
+    interface PromptReturnValue {
+      id: string;
+      operator: ConditionOperatorValue;
+      value: string;
+      message: string;
+    }
+
     interface PromptVariant {
       id: string;
       type: "prompt";
       promptId: string;
+      text: string;
+      returnValues: PromptReturnValue[];
     }
 
     type MessageVariant = ConditionVariant | ExpressionVariant | PromptVariant;
+
+    const isConditionOperator = (
+      value: string
+    ): value is ConditionOperatorValue =>
+      CONDITION_OPERATORS.some((operator) => operator.value === value);
+
+    const normalizePromptReturnValues = (
+      raw: unknown
+    ): PromptReturnValue[] => {
+      if (!Array.isArray(raw)) return [];
+
+      return raw
+        .map<PromptReturnValue | null>((entry) => {
+          if (!entry) return null;
+
+          const ensuredId =
+            typeof entry.id === "string" && entry.id.trim().length > 0
+              ? entry.id
+              : nanoid();
+
+          const operator =
+            typeof entry.operator === "string" &&
+            isConditionOperator(entry.operator)
+              ? entry.operator
+              : "is";
+
+          const value =
+            typeof entry.value === "string"
+              ? entry.value
+              : typeof entry.variable === "string"
+              ? entry.variable
+              : "";
+
+          const message =
+            typeof entry.message === "string"
+              ? entry.message
+              : typeof entry.text === "string"
+              ? entry.text
+              : typeof entry.response === "string"
+              ? entry.response
+              : "";
+
+          return {
+            id: ensuredId,
+            operator,
+            value,
+            message,
+          };
+        })
+        .filter((entry): entry is PromptReturnValue => entry !== null);
+    };
 
     const normalizeVariants = (raw: unknown): MessageVariant[] => {
       if (!Array.isArray(raw)) return [];
@@ -4300,6 +4366,8 @@ export default function PropertiesPanel({
                 id: nanoid(),
                 type: "prompt",
                 promptId: extractPromptName(item),
+                text: "",
+                returnValues: [],
               };
             }
 
@@ -4324,6 +4392,15 @@ export default function PropertiesPanel({
                 id: ensuredId,
                 type: "prompt",
                 promptId: typed.promptId,
+                text:
+                  typeof typed.text === "string"
+                    ? typed.text
+                    : typeof typed.message === "string"
+                    ? typed.message
+                    : "",
+                returnValues: normalizePromptReturnValues(
+                  typed.returnValues ?? typed.returns ?? typed.cases ?? []
+                ),
               };
             }
 
@@ -4366,6 +4443,15 @@ export default function PropertiesPanel({
                 id: ensuredId,
                 type: "prompt",
                 promptId: typed.prompt,
+                text:
+                  typeof typed.text === "string"
+                    ? typed.text
+                    : typeof typed.message === "string"
+                    ? typed.message
+                    : "",
+                returnValues: normalizePromptReturnValues(
+                  typed.returnValues ?? typed.returns ?? typed.cases ?? []
+                ),
               };
             }
 
@@ -4375,6 +4461,15 @@ export default function PropertiesPanel({
                   id: ensuredId,
                   type: "prompt",
                   promptId: extractPromptName(typed.value),
+                  text:
+                    typeof typed.text === "string"
+                      ? typed.text
+                      : typeof typed.message === "string"
+                      ? typed.message
+                      : "",
+                  returnValues: normalizePromptReturnValues(
+                    typed.returnValues ?? typed.returns ?? typed.cases ?? []
+                  ),
                 };
               }
 
@@ -4414,6 +4509,9 @@ export default function PropertiesPanel({
       "all" | "any"
     >("all");
     const [variantCode, setVariantCode] = useState("");
+    const [promptReturnValues, setPromptReturnValues] = useState<
+      PromptReturnValue[]
+    >([]);
     const [showVariantFullScreenEditor, setShowVariantFullScreenEditor] =
       useState(false);
     const [promptVariantSelection, setPromptVariantSelection] = useState("");
@@ -4456,6 +4554,7 @@ export default function PropertiesPanel({
       setVariantConditionMatchType("all");
       setVariantCode("");
       setPromptVariantSelection("");
+      setPromptReturnValues([]);
       setEditingVariantId(null);
       setShowVariantTypePopover(false);
       setShowPromptPopover(false);
@@ -4501,6 +4600,7 @@ export default function PropertiesPanel({
       setVariantConditionMatchType("all");
       setVariantCode("");
       setPromptVariantSelection("");
+      setPromptReturnValues([]);
       setEditingVariantId(null);
       setShowVariantTypePopover(false);
       setShowPromptPopover(initialType === "prompt");
@@ -4518,6 +4618,7 @@ export default function PropertiesPanel({
         setVariantConditionRules([]);
         setVariantConditionMatchType("all");
         setVariantCode("");
+        setPromptReturnValues([]);
         setShowPromptPopover(true);
         setShowConditionBuilder(false);
         setShowExpressionEditor(false);
@@ -4525,6 +4626,7 @@ export default function PropertiesPanel({
       } else if (type === "condition") {
         setPromptVariantSelection("");
         setVariantCode("");
+        setPromptReturnValues([]);
         setShowPromptPopover(false);
         setShowConditionBuilder(true);
         setShowExpressionEditor(false);
@@ -4533,6 +4635,7 @@ export default function PropertiesPanel({
         setPromptVariantSelection("");
         setVariantConditionRules([]);
         setVariantConditionMatchType("all");
+        setPromptReturnValues([]);
         setShowPromptPopover(false);
         setShowConditionBuilder(false);
         setShowExpressionEditor(true);
@@ -4540,16 +4643,37 @@ export default function PropertiesPanel({
       }
     };
 
-    const prompts = useAppSelector((state) => state.prompts.prompts);
-
-    const selectedPromptPreview = useMemo(() => {
-      const selection = promptVariantSelection.trim();
-      if (!selection) return null;
-      return prompts.find((prompt) => prompt.name === selection) || null;
-    }, [promptVariantSelection, prompts]);
-
     const handleVariantEditorChange = (value: string) => {
       setVariantEditorValue(value);
+    };
+
+    const handleAddPromptReturnValue = () => {
+      setPromptReturnValues((current) => [
+        ...current,
+        {
+          id: nanoid(),
+          operator: "is",
+          value: "",
+          message: "",
+        },
+      ]);
+    };
+
+    const handleUpdatePromptReturnValue = (
+      returnId: string,
+      updates: Partial<Omit<PromptReturnValue, "id">>
+    ) => {
+      setPromptReturnValues((current) =>
+        current.map((entry) =>
+          entry.id === returnId ? { ...entry, ...updates } : entry
+        )
+      );
+    };
+
+    const handleRemovePromptReturnValue = (returnId: string) => {
+      setPromptReturnValues((current) =>
+        current.filter((entry) => entry.id !== returnId)
+      );
     };
 
     const persistVariants = (updater: (current: MessageVariant[]) => MessageVariant[]) => {
@@ -4565,11 +4689,30 @@ export default function PropertiesPanel({
 
       if (variantType === "prompt") {
         const promptId = promptVariantSelection.trim();
-        if (!promptId) return;
+        const message = variantEditorValue.trim();
+        if (!promptId || !message) return;
+
+        const sanitizedReturnValues = promptReturnValues
+          .map((entry) => {
+            const operator = isConditionOperator(entry.operator)
+              ? entry.operator
+              : "is";
+
+            return {
+              ...entry,
+              operator,
+              value: entry.value.trim(),
+              message: entry.message.trim(),
+            };
+          })
+          .filter((entry) => entry.message.length > 0);
+
         nextVariant = {
           id: editingVariantId ?? nanoid(),
           type: "prompt",
           promptId,
+          text: message,
+          returnValues: sanitizedReturnValues,
         };
       } else if (variantType === "condition") {
         const content = variantEditorValue.trim();
@@ -4619,6 +4762,7 @@ export default function PropertiesPanel({
       setVariantConditionMatchType("all");
       setVariantCode("");
       setPromptVariantSelection("");
+      setPromptReturnValues([]);
       setEditingVariantId(null);
       setShowPromptPopover(false);
       setShowConditionBuilder(false);
@@ -4634,6 +4778,7 @@ export default function PropertiesPanel({
       setVariantConditionMatchType("all");
       setVariantCode("");
       setPromptVariantSelection("");
+      setPromptReturnValues([]);
       setEditingVariantId(null);
       setShowPromptPopover(false);
       setShowConditionBuilder(false);
@@ -4653,10 +4798,11 @@ export default function PropertiesPanel({
       if (variant.type === "prompt") {
         setVariantType("prompt");
         setPromptVariantSelection(variant.promptId);
-        setVariantEditorValue("");
+        setVariantEditorValue(variant.text || "");
         setVariantConditionRules([]);
         setVariantConditionMatchType("all");
         setVariantCode("");
+        setPromptReturnValues(variant.returnValues || []);
         setShowPromptPopover(false);
         setShowConditionBuilder(false);
         setShowExpressionEditor(false);
@@ -4668,6 +4814,7 @@ export default function PropertiesPanel({
         setVariantConditionMatchType(variant.matchType);
         setPromptVariantSelection("");
         setVariantCode("");
+        setPromptReturnValues([]);
         setShowPromptPopover(false);
         setShowConditionBuilder(false);
         setShowExpressionEditor(false);
@@ -4679,6 +4826,7 @@ export default function PropertiesPanel({
         setPromptVariantSelection("");
         setVariantConditionRules([]);
         setVariantConditionMatchType("all");
+        setPromptReturnValues([]);
         setShowPromptPopover(false);
         setShowConditionBuilder(false);
         setShowExpressionEditor(false);
@@ -4712,7 +4860,10 @@ export default function PropertiesPanel({
 
     const canSaveVariant = useMemo(() => {
       if (variantType === "prompt") {
-        return promptVariantSelection.trim().length > 0;
+        return (
+          promptVariantSelection.trim().length > 0 &&
+          variantEditorValue.trim().length > 0
+        );
       }
 
       if (variantType === "condition") {
@@ -4761,7 +4912,15 @@ export default function PropertiesPanel({
 
     const getVariantSecondaryText = (variant: MessageVariant) => {
       if (variant.type === "prompt") {
-        return "Reuses prompt content";
+        const returnCount = variant.returnValues?.length || 0;
+        if (returnCount > 0) {
+          const plural = returnCount === 1 ? "return value" : "return values";
+          return `${returnCount} ${plural}`;
+        }
+
+        return variant.text.trim().length > 0
+          ? ellipsize(variant.text)
+          : "No message configured";
       }
 
       if (variant.type === "condition") {
@@ -4781,6 +4940,24 @@ export default function PropertiesPanel({
     };
 
     const variantLogicSummary = useMemo(() => {
+      if (variantType === "prompt") {
+        if (!promptVariantSelection.trim()) {
+          return "Select a prompt to use this variant.";
+        }
+
+        if (!variantEditorValue.trim()) {
+          return "Add message content for this prompt variant.";
+        }
+
+        if (promptReturnValues.length === 0) {
+          return "Add return values to handle prompt responses or leave empty to use the base message.";
+        }
+
+        const count = promptReturnValues.length;
+        const plural = count === 1 ? "return value" : "return values";
+        return `${count} ${plural} configured.`;
+      }
+
       if (variantType === "condition") {
         if (variantConditionRules.length === 0) {
           return "Add at least one condition to use this variant.";
@@ -4801,6 +4978,9 @@ export default function PropertiesPanel({
       return "";
     }, [
       variantType,
+      promptVariantSelection,
+      variantEditorValue,
+      promptReturnValues,
       variantConditionRules,
       variantConditionMatchType,
       variantCode,
@@ -5005,83 +5185,141 @@ export default function PropertiesPanel({
                 )}
               </div>
 
-              {variantType === "prompt" ? (
-                <>
-                  <Popover
-                    placement="right"
-                    trigger="click"
-                    open={showPromptPopover}
-                    onOpenChange={setShowPromptPopover}
-                    overlayStyle={{ zIndex: 50000 }}
-                    getPopupContainer={() => document.body}
-                    content={
-                      <div className={styles.promptVariantPopover}>
-                        <PromptPicker
-                          value={promptVariantSelection || ""}
-                          onChange={(val) =>
-                            setPromptVariantSelection(val || "")
-                          }
-                          placeholder="Select prompt"
-                          allowCreate
-                          size="middle"
-                          style={{ width: "100%" }}
-                        />
-                        <div className={styles.promptVariantPopoverActions}>
-                          <Button
-                            size="small"
-                            type="primary"
-                            block
-                            disabled={!promptVariantSelection.trim()}
-                            onClick={() => setShowPromptPopover(false)}
-                          >
-                            Done
-                          </Button>
+              <>
+                {variantType === "prompt" ? (
+                  <>
+                    <Popover
+                      placement="right"
+                      trigger="click"
+                      open={showPromptPopover}
+                      onOpenChange={setShowPromptPopover}
+                      overlayStyle={{ zIndex: 50000 }}
+                      getPopupContainer={() => document.body}
+                      content={
+                        <div className={styles.promptVariantPopover}>
+                          <PromptPicker
+                            value={promptVariantSelection || ""}
+                            onChange={(val) =>
+                              setPromptVariantSelection(val || "")
+                            }
+                            placeholder="Select prompt"
+                            allowCreate
+                            size="middle"
+                            style={{ width: "100%" }}
+                          />
+                          <div className={styles.promptVariantPopoverActions}>
+                            <Button
+                              size="small"
+                              type="primary"
+                              block
+                              disabled={!promptVariantSelection.trim()}
+                              onClick={() => setShowPromptPopover(false)}
+                            >
+                              Done
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    }
-                  >
-                    <Button
-                      type="default"
-                      block
-                      className={styles.promptVariantSelectButton}
-                    >
-                      {promptVariantSelection
-                        ? `Prompt: ${promptVariantSelection}`
-                        : "Select prompt"}
-                    </Button>
-                  </Popover>
-                  <div
-                    className={`${styles.promptVariantPreview} ${
-                      showPromptPopover ? styles.promptVariantPreviewActive : ""
-                    }`}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setShowPromptPopover(true)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        setShowPromptPopover(true);
                       }
-                    }}
-                  >
-                    {selectedPromptPreview ? (
-                      <div
-                        className={styles.promptVariantPreviewContent}
-                        dangerouslySetInnerHTML={{
-                          __html: renderFormattedReprompt(
-                            selectedPromptPreview.content || ""
-                          ),
-                        }}
+                    >
+                      <Button
+                        type="default"
+                        block
+                        className={styles.promptVariantSelectButton}
+                      >
+                        {promptVariantSelection
+                          ? `Prompt: ${promptVariantSelection}`
+                          : "Select prompt"}
+                      </Button>
+                    </Popover>
+                    <div className={styles.variantTextAreaWrapper}>
+                      <RichTextEditor
+                        value={variantEditorValue}
+                        onChange={handleVariantEditorChange}
+                        placeholder="Enter the message to send when this variant matches"
+                        className={styles.variantRichTextEditor}
                       />
-                    ) : (
-                      <span className={styles.promptVariantPreviewPlaceholder}>
-                        Enter the message to send when this variant matches
-                      </span>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <>
+                    </div>
+                    <div className={styles.promptReturnSection}>
+                      <div className={styles.promptReturnHeader}>
+                        <span className={styles.promptReturnTitle}>Return values</span>
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={<PlusOutlined />}
+                          onClick={handleAddPromptReturnValue}
+                          className={styles.promptReturnAddButton}
+                          aria-label="Add return value"
+                        />
+                      </div>
+                      {promptReturnValues.length === 0 ? (
+                        <div className={styles.promptReturnEmpty}>
+                          Map prompt responses to specific messages by adding return values.
+                        </div>
+                      ) : (
+                        promptReturnValues.map((returnValue, index) => {
+                          const labelPrefix = index === 0 ? "if" : "else if";
+                          return (
+                            <React.Fragment key={returnValue.id}>
+                              {index > 0 && (
+                                <Divider className={styles.promptReturnDivider} />
+                              )}
+                              <div className={styles.promptReturnItem}>
+                                <div className={styles.promptReturnConditionRow}>
+                                  <span className={styles.promptReturnIfLabel}>
+                                    {`${labelPrefix} value`}
+                                  </span>
+                                  <Select
+                                    value={returnValue.operator}
+                                    onChange={(value: ConditionOperatorValue) =>
+                                      handleUpdatePromptReturnValue(returnValue.id, {
+                                        operator: value,
+                                      })
+                                    }
+                                    options={CONDITION_OPERATOR_SELECT_OPTIONS}
+                                    size="middle"
+                                    className={styles.promptReturnOperator}
+                                    popupMatchSelectWidth={false}
+                                  />
+                                  <ValueInput
+                                    value={returnValue.value}
+                                    onChange={(value) =>
+                                      handleUpdatePromptReturnValue(returnValue.id, { value })
+                                    }
+                                    placeholder="value or {var}"
+                                    size="middle"
+                                    className={styles.promptReturnValueInput}
+                                  />
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    icon={<DeleteOutlined />}
+                                    onClick={() =>
+                                      handleRemovePromptReturnValue(returnValue.id)
+                                    }
+                                    className={styles.promptReturnRemoveButton}
+                                    aria-label="Remove return value"
+                                  />
+                                </div>
+                                <div className={styles.promptReturnMessage}>
+                                  <RichTextEditor
+                                    value={returnValue.message}
+                                    onChange={(value) =>
+                                      handleUpdatePromptReturnValue(returnValue.id, {
+                                        message: value,
+                                      })
+                                    }
+                                    placeholder="Enter the message to send when this return value matches"
+                                    className={`${styles.variantRichTextEditor} ${styles.promptReturnEditor}`}
+                                  />
+                                </div>
+                              </div>
+                            </React.Fragment>
+                          );
+                        })
+                      )}
+                    </div>
+                  </>
+                ) : (
                   <div className={styles.variantTextAreaWrapper}>
                     <RichTextEditor
                       value={variantEditorValue}
@@ -5090,16 +5328,16 @@ export default function PropertiesPanel({
                       className={styles.variantRichTextEditor}
                     />
                   </div>
-                  {variantLogicSummary && (
-                    <Typography.Text
-                      type="secondary"
-                      className={styles.variantLogicSummary}
-                    >
-                      {variantLogicSummary}
-                    </Typography.Text>
-                  )}
-                </>
-              )}
+                )}
+                {variantLogicSummary && (
+                  <Typography.Text
+                    type="secondary"
+                    className={styles.variantLogicSummary}
+                  >
+                    {variantLogicSummary}
+                  </Typography.Text>
+                )}
+              </>
 
               <div className={styles.variantEditorActions}>
                 <Button onClick={handleCancelEdit}>Cancel</Button>
