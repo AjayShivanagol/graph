@@ -5197,16 +5197,102 @@ export default function PropertiesPanel({
                       getPopupContainer={() => document.body}
                       content={
                         <div className={styles.promptVariantPopover}>
-                          <PromptPicker
-                            value={promptVariantSelection || ""}
-                            onChange={(val) =>
-                              setPromptVariantSelection(val || "")
-                            }
-                            placeholder="Select prompt"
-                            allowCreate
-                            size="middle"
-                            style={{ width: "100%" }}
-                          />
+                          <div className={styles.promptVariantPopoverContent}>
+                            <PromptPicker
+                              value={promptVariantSelection || ""}
+                              onChange={(val) =>
+                                setPromptVariantSelection(val || "")
+                              }
+                              placeholder="Select prompt"
+                              allowCreate
+                              size="middle"
+                              style={{ width: "100%" }}
+                            />
+                            <div className={styles.promptReturnSection}>
+                              <div className={styles.promptReturnHeader}>
+                                <span className={styles.promptReturnTitle}>
+                                  Return values
+                                </span>
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={<PlusOutlined />}
+                                  onClick={handleAddPromptReturnValue}
+                                  className={styles.promptReturnAddButton}
+                                  aria-label="Add return value"
+                                />
+                              </div>
+                              {promptReturnValues.length === 0 ? (
+                                <div className={styles.promptReturnEmpty}>
+                                  Map prompt responses to specific messages by adding return
+                                  values.
+                                </div>
+                              ) : (
+                                promptReturnValues.map((returnValue, index) => {
+                                  const labelPrefix = index === 0 ? "if" : "else if";
+                                  return (
+                                    <React.Fragment key={returnValue.id}>
+                                      {index > 0 && (
+                                        <Divider className={styles.promptReturnDivider} />
+                                      )}
+                                      <div className={styles.promptReturnItem}>
+                                        <div className={styles.promptReturnConditionRow}>
+                                          <span className={styles.promptReturnIfLabel}>
+                                            {`${labelPrefix} value`}
+                                          </span>
+                                          <Select
+                                            value={returnValue.operator}
+                                            onChange={(value: ConditionOperatorValue) =>
+                                              handleUpdatePromptReturnValue(returnValue.id, {
+                                                operator: value,
+                                              })
+                                            }
+                                            options={CONDITION_OPERATOR_SELECT_OPTIONS}
+                                            size="middle"
+                                            className={styles.promptReturnOperator}
+                                            popupMatchSelectWidth={false}
+                                          />
+                                          <ValueInput
+                                            value={returnValue.value}
+                                            onChange={(value) =>
+                                              handleUpdatePromptReturnValue(returnValue.id, {
+                                                value,
+                                              })
+                                            }
+                                            placeholder="value or {var}"
+                                            size="middle"
+                                            className={styles.promptReturnValueInput}
+                                          />
+                                          <Button
+                                            type="text"
+                                            size="small"
+                                            icon={<DeleteOutlined />}
+                                            onClick={() =>
+                                              handleRemovePromptReturnValue(returnValue.id)
+                                            }
+                                            className={styles.promptReturnRemoveButton}
+                                            aria-label="Remove return value"
+                                          />
+                                        </div>
+                                        <div className={styles.promptReturnMessage}>
+                                          <RichTextEditor
+                                            value={returnValue.message}
+                                            onChange={(value) =>
+                                              handleUpdatePromptReturnValue(returnValue.id, {
+                                                message: value,
+                                              })
+                                            }
+                                            placeholder="Enter the message to send when this return value matches"
+                                            className={`${styles.variantRichTextEditor} ${styles.promptReturnEditor}`}
+                                          />
+                                        </div>
+                                      </div>
+                                    </React.Fragment>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </div>
                           <div className={styles.promptVariantPopoverActions}>
                             <Button
                               size="small"
@@ -5238,85 +5324,6 @@ export default function PropertiesPanel({
                         placeholder="Enter the message to send when this variant matches"
                         className={styles.variantRichTextEditor}
                       />
-                    </div>
-                    <div className={styles.promptReturnSection}>
-                      <div className={styles.promptReturnHeader}>
-                        <span className={styles.promptReturnTitle}>Return values</span>
-                        <Button
-                          type="text"
-                          size="small"
-                          icon={<PlusOutlined />}
-                          onClick={handleAddPromptReturnValue}
-                          className={styles.promptReturnAddButton}
-                          aria-label="Add return value"
-                        />
-                      </div>
-                      {promptReturnValues.length === 0 ? (
-                        <div className={styles.promptReturnEmpty}>
-                          Map prompt responses to specific messages by adding return values.
-                        </div>
-                      ) : (
-                        promptReturnValues.map((returnValue, index) => {
-                          const labelPrefix = index === 0 ? "if" : "else if";
-                          return (
-                            <React.Fragment key={returnValue.id}>
-                              {index > 0 && (
-                                <Divider className={styles.promptReturnDivider} />
-                              )}
-                              <div className={styles.promptReturnItem}>
-                                <div className={styles.promptReturnConditionRow}>
-                                  <span className={styles.promptReturnIfLabel}>
-                                    {`${labelPrefix} value`}
-                                  </span>
-                                  <Select
-                                    value={returnValue.operator}
-                                    onChange={(value: ConditionOperatorValue) =>
-                                      handleUpdatePromptReturnValue(returnValue.id, {
-                                        operator: value,
-                                      })
-                                    }
-                                    options={CONDITION_OPERATOR_SELECT_OPTIONS}
-                                    size="middle"
-                                    className={styles.promptReturnOperator}
-                                    popupMatchSelectWidth={false}
-                                  />
-                                  <ValueInput
-                                    value={returnValue.value}
-                                    onChange={(value) =>
-                                      handleUpdatePromptReturnValue(returnValue.id, { value })
-                                    }
-                                    placeholder="value or {var}"
-                                    size="middle"
-                                    className={styles.promptReturnValueInput}
-                                  />
-                                  <Button
-                                    type="text"
-                                    size="small"
-                                    icon={<DeleteOutlined />}
-                                    onClick={() =>
-                                      handleRemovePromptReturnValue(returnValue.id)
-                                    }
-                                    className={styles.promptReturnRemoveButton}
-                                    aria-label="Remove return value"
-                                  />
-                                </div>
-                                <div className={styles.promptReturnMessage}>
-                                  <RichTextEditor
-                                    value={returnValue.message}
-                                    onChange={(value) =>
-                                      handleUpdatePromptReturnValue(returnValue.id, {
-                                        message: value,
-                                      })
-                                    }
-                                    placeholder="Enter the message to send when this return value matches"
-                                    className={`${styles.variantRichTextEditor} ${styles.promptReturnEditor}`}
-                                  />
-                                </div>
-                              </div>
-                            </React.Fragment>
-                          );
-                        })
-                      )}
                     </div>
                   </>
                 ) : (

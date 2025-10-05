@@ -843,10 +843,20 @@
 }
 
 .promptVariantPopover {
-  width: 260px;
+  width: 420px;
+  max-width: 420px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.promptVariantPopoverContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 440px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .promptVariantPopoverActions {
@@ -855,7 +865,7 @@
 }
 
 .promptReturnSection {
-  margin-top: 12px;
+  margin-top: 0;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 12px;
