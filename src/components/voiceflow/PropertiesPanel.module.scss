@@ -828,6 +828,18 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  background: #fff;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    color 0.2s ease;
+}
+
+.promptVariantSelectButton:hover,
+.promptVariantSelectButton:focus {
+  border-color: #1677ff;
+  color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.16);
 }
 
 .promptVariantPopover {
@@ -840,6 +852,63 @@
 .promptVariantPopoverActions {
   display: flex;
   gap: 8px;
+}
+
+.promptVariantPreview {
+  margin-top: 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+  min-height: 120px;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+  display: flex;
+  align-items: flex-start;
+  justify-content: stretch;
+}
+
+.promptVariantPreview:hover {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
+}
+
+.promptVariantPreviewActive,
+.promptVariantPreview:focus-within {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.16);
+}
+
+.promptVariantPreviewContent {
+  width: 100%;
+  color: #0f172a;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.promptVariantPreviewContent :global(strong) {
+  font-weight: 600;
+}
+
+.promptVariantPreviewContent :global(.underline) {
+  text-decoration: underline;
+}
+
+.promptVariantPreviewContent :global(.strike) {
+  text-decoration: line-through;
+}
+
+.promptVariantPreviewPlaceholder {
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.variantRichTextEditor {
+  margin-top: 4px;
 }
 
 .variantCodeEditorPopover {

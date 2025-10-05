@@ -66,7 +66,6 @@ import PromptPicker from "../common/PromptPicker";
 import PromptEditor from "../common/PromptEditor";
 import ValueInput, { ValueInputHandle } from "../common/ValueInput";
 import RichTextEditor, { RichTextEditorHandle } from "../common/RichTextEditor";
-import VariantTextEditor from "../common/VariantTextEditor";
 import FullScreenCodeEditor from "../common/FullScreenCodeEditor";
 import ApiProperties from "./ApiProperties";
 import KbSearchProperties from "./KbSearchProperties";
@@ -4534,6 +4533,14 @@ export default function PropertiesPanel({
       }
     };
 
+    const prompts = useAppSelector((state) => state.prompts.prompts);
+
+    const selectedPromptPreview = useMemo(() => {
+      const selection = promptVariantSelection.trim();
+      if (!selection) return null;
+      return prompts.find((prompt) => prompt.name === selection) || null;
+    }, [promptVariantSelection, prompts]);
+
     const handleVariantEditorChange = (value: string) => {
       setVariantEditorValue(value);
     };
@@ -4956,56 +4963,88 @@ export default function PropertiesPanel({
               </div>
 
               {variantType === "prompt" ? (
-                <Popover
-                  placement="right"
-                  trigger="click"
-                  open={showPromptPopover}
-                  onOpenChange={setShowPromptPopover}
-                  overlayStyle={{ zIndex: 50000 }}
-                  getPopupContainer={() => document.body}
-                  content={
-                    <div className={styles.promptVariantPopover}>
-                      <PromptPicker
-                        value={promptVariantSelection || ""}
-                        onChange={(val) => setPromptVariantSelection(val || "")}
-                        placeholder="Select prompt"
-                        allowCreate
-                        size="middle"
-                        style={{ width: "100%" }}
-                        bordered={false}
-                      />
-                      <div className={styles.promptVariantPopoverActions}>
-                        <Button
-                          size="small"
-                          type="primary"
-                          block
-                          disabled={!promptVariantSelection.trim()}
-                          onClick={() => setShowPromptPopover(false)}
-                        >
-                          Done
-                        </Button>
+                <>
+                  <Popover
+                    placement="right"
+                    trigger="click"
+                    open={showPromptPopover}
+                    onOpenChange={setShowPromptPopover}
+                    overlayStyle={{ zIndex: 50000 }}
+                    getPopupContainer={() => document.body}
+                    content={
+                      <div className={styles.promptVariantPopover}>
+                        <PromptPicker
+                          value={promptVariantSelection || ""}
+                          onChange={(val) =>
+                            setPromptVariantSelection(val || "")
+                          }
+                          placeholder="Select prompt"
+                          allowCreate
+                          size="middle"
+                          style={{ width: "100%" }}
+                        />
+                        <div className={styles.promptVariantPopoverActions}>
+                          <Button
+                            size="small"
+                            type="primary"
+                            block
+                            disabled={!promptVariantSelection.trim()}
+                            onClick={() => setShowPromptPopover(false)}
+                          >
+                            Done
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  }
-                >
-                  <Button
-                    type="default"
-                    block
-                    className={styles.promptVariantSelectButton}
+                    }
                   >
-                    {promptVariantSelection
-                      ? `Prompt: ${promptVariantSelection}`
-                      : "Select prompt"}
-                  </Button>
-                </Popover>
+                    <Button
+                      type="default"
+                      block
+                      className={styles.promptVariantSelectButton}
+                    >
+                      {promptVariantSelection
+                        ? `Prompt: ${promptVariantSelection}`
+                        : "Select prompt"}
+                    </Button>
+                  </Popover>
+                  <div
+                    className={`${styles.promptVariantPreview} ${
+                      showPromptPopover ? styles.promptVariantPreviewActive : ""
+                    }`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setShowPromptPopover(true)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setShowPromptPopover(true);
+                      }
+                    }}
+                  >
+                    {selectedPromptPreview ? (
+                      <div
+                        className={styles.promptVariantPreviewContent}
+                        dangerouslySetInnerHTML={{
+                          __html: renderFormattedReprompt(
+                            selectedPromptPreview.content || ""
+                          ),
+                        }}
+                      />
+                    ) : (
+                      <span className={styles.promptVariantPreviewPlaceholder}>
+                        Enter the message to send when this variant matches
+                      </span>
+                    )}
+                  </div>
+                </>
               ) : (
                 <>
                   <div className={styles.variantTextAreaWrapper}>
-                    <VariantTextEditor
+                    <RichTextEditor
                       value={variantEditorValue}
                       onChange={handleVariantEditorChange}
                       placeholder="Enter the message to send when this variant matches"
-                      rows={4}
+                      className={styles.variantRichTextEditor}
                     />
                   </div>
                   {variantLogicSummary && (
